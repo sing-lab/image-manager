@@ -1,0 +1,12 @@
+{
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "Mathias Gonin",
+  "development_status": "Development Status :: 1 - Planning",
+  "email": "matgonin0@gmail.com",
+  "friendly_name": "Image_Manager",
+  "github_user": "sing-lab",
+  "license": "MIT",
+  "package_name": "image_manager",
+  "project_name": "image_manager",
+  "version": "0.0.0"
+}
