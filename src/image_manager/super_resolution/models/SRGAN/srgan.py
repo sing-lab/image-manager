@@ -308,13 +308,14 @@ class SRGAN(SuperResolutionModel):
                 sr_images = self.generator(lr_images)  # Super resolution images.
 
                 # Save images.
-                for i in range(sr_images.size(0)):
-                    images = torch.stack([transform(reverse_normalize(lr_images[i, :, :, :])),
-                                          transform(sr_images[i, :, :, :]),
-                                          transform(hr_images[i, :, :, :])])
-                    grid = make_grid(images, nrow=3, padding=5)
-                    save_image(grid,
-                               os.path.join(save_folder_images, f'image_{i_batch * batch_size + i}.png'), padding=5)
+                if save_folder_images and i_batch % (total_batch // 10) == 0:
+                    for i in range(sr_images.size(0)):
+                        images = torch.stack([transform(reverse_normalize(lr_images[i, :, :, :])),
+                                              transform(sr_images[i, :, :, :]),
+                                              transform(hr_images[i, :, :, :])])
+                        grid = make_grid(images, nrow=3, padding=5)
+                        save_image(grid,
+                                   os.path.join(save_folder_images, f'image_{i_batch * batch_size + i}.png'), padding=5)
 
                 hr_images = 255 * hr_images  # Map from [0, 1] to [0, 255]
                 sr_images = 255 * sr_images  # Map from [0, 1] to [0, 255]

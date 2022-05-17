@@ -1,0 +1,22 @@
+# Configuration file for training a SRGAN model.
+
+experiment_name: 'SRGAN/training_V1'
+
+# Paths
+root_path: '../../../'
+
+model_save_path: 'models/super_resolution/'
+
+train_data_input_path: 'data/raw/train'
+val_data_input_path: 'data/raw/val'
+test_data_input_path: 'data/raw/test'
+
+val_data_output_path: 'data/processed/val/'
+test_data_output_path: 'data/processed/test/'
+
+pretrained_generator_path: 'models/super_resolution/SRResNet/training_V3/best_generator_epoch_30.torch'
+
+# Hyperparameters
+batch_size: 32
+nb_epoch: 52
+lr: 1e-4  # float is returned as a string!

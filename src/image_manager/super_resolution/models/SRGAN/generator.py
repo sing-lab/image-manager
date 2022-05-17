@@ -313,10 +313,7 @@ class SRResNet(nn.Module):
                 val_losses.append(loss)
 
                 # Save images.
-                if save_folder_images:
-                    if not os.path.exists(save_folder_images):
-                        os.makedirs(save_folder_images)
-
+                if save_folder_images and i_batch % (total_batch // 10) == 0:
                     for i in range(sr_images.size(0)):
                         images = torch.stack([transform(reverse_normalize(lr_images[i, :, :, :])),
                                               transform(sr_images[i, :, :, :]),

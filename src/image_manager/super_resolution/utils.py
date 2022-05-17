@@ -7,6 +7,7 @@ from typing import List, Tuple, Optional
 from super_resolution_data import SuperResolutionData
 from torch.utils.data import DataLoader
 from torch import tensor
+import yaml
 
 
 def set_seed(seed: int = 0):
@@ -89,3 +90,21 @@ def get_dataset_stat(dataset: Optional[SuperResolutionData] = None, dataset_name
     std = (channels_squared_sum / num_batches - mean ** 2) ** 0.5
 
     return mean, std
+
+
+def load_config(config_path):
+    """
+    Load a configuration file
+
+    Parameters
+    ----------
+    config_path: str
+        The config file path.
+
+    Returns
+    -------
+
+    """
+    with open(config_path) as file:
+        config = yaml.safe_load(file)
+    return config
