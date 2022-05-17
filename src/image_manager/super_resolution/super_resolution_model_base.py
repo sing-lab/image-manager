@@ -18,9 +18,5 @@ class SuperResolutionModel(ABC):
         pass
 
     @abstractmethod
-    def save(self):
-        pass
-
-    @abstractmethod
     def load(self):
         pass
