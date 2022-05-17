@@ -33,26 +33,25 @@ class Discriminator(nn.Module):
 
         conv_blocks = []
         in_channels = 3  # Number of input channels for the first convolutional block.
-        for i in range(n_conv_blocks):
-            # out_channels
-            if not i and not i % 2:
-                out_channels = n_channels
-            elif i != 0 and not i % 2:
-                out_channels = in_channels * 2
-            else:
-                out_channels = in_channels
 
-            # stride
+        for i in range(n_conv_blocks):
+
+            # out_channels and stride
             if not i % 2:
                 stride = 1
+                if not i:
+                    out_channels = n_channels
+                else:
+                    out_channels = in_channels * 2
             else:
                 stride = 2
+                out_channels = in_channels
 
             # batch_norm
             if not i:
-                batch_norm = True
-            else:
                 batch_norm = False
+            else:
+                batch_norm = True
 
             conv_block = ConvolutionalBlock(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
                                             stride=stride, batch_norm=batch_norm, activation='LeakyReLu')

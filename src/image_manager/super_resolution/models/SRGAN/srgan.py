@@ -343,9 +343,9 @@ class SRGAN(SuperResolutionModel):
 
         return sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
 
-    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 16, save_folder: str = "") -> List[np.array]:
+    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "") -> None:
         """
-        Process an image into super resolution  #TODO no HR image ...
+        Process an image into super resolution.
 
         Parameters
         ----------
@@ -353,33 +353,39 @@ class SRGAN(SuperResolutionModel):
             The images to process.
         batch_size: int, default 16
             The batch size for predictions.
-        save_folder: str
+        save_folder_images: str
             The folder where to save predicted images.
 
-        Returns
-        -------
-        List[np.array]
-            The super resolved images.
         """
-        # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')  #TODO gpu
-        device = torch.device('cpu')
+        if save_folder_images:
+            if os.path.exists(save_folder_images):
+                shutil.rmtree(save_folder_images, ignore_errors=True)
+            os.makedirs(save_folder_images)
+        else:
+            print("Images won't be saved. To save images, please specify a save folder path.")
+
+        # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        device = torch.device('cpu')  #TODO remove
         self.generator.to(device)
         self.generator.eval()
 
         data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
-        predictions = []
 
-        with torch.no_grad():  # TODO prediction on full size image
+        normalize = Normalize(mean=[0.475, 0.434, 0.392], std=[0.262, 0.252, 0.262])  # Computed stats
+
+        with torch.no_grad():
             for i_batch, (lr_images, hr_images) in enumerate(data_loader):
+                hr_images = normalize(hr_images)
                 hr_images = hr_images.to(device)
                 sr_images = self.generator(hr_images)
 
-                # Saving images
-                for i in range(sr_images.size(0)):
-                    save_image(sr_images[i, :, :, :], os.path.join(save_folder, f'{i_batch * batch_size + i}.png'))
-                    predictions.append(to_pil_image(sr_images[i, :, :, :]))
+                # Save images
+                if save_folder_images:
+                    for i in range(sr_images.size(0)):
+                        save_image(sr_images[i, :, :, :],
+                                   os.path.join(save_folder_images, f'{i_batch * batch_size + i}.png'))
 
-        return predictions
+        return
 
     def load(self, generator: Optional[Union[Generator, str]] = None,
              discriminator: Optional[Union[Discriminator, str]] = None):
@@ -414,9 +420,6 @@ class SRGAN(SuperResolutionModel):
                 self.discriminator.load_state_dict(discriminator.state_dict())
             else:
                 raise TypeError("Generator argument must be either a path to a trained model, or a trained model.")
-
-    def save(self):
-        pass
 
     def test(self):
         """
