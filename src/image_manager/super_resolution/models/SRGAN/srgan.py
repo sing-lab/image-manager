@@ -91,7 +91,7 @@ class SRGAN(SuperResolutionModel):
         writer = SummaryWriter(os.path.join("samples", "logs", "GAN"))
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        self.generator.model.to(device)
+        self.generator.to(device)
         self.discriminator.to(device)
 
         self.truncated_vgg.to(device)
@@ -112,7 +112,7 @@ class SRGAN(SuperResolutionModel):
                                  persistent_workers=True)
 
         # Initialize generator's optimizer
-        optimizer_g = Adam(params=filter(lambda p: p.requires_grad, self.generator.model.parameters()), lr=learning_rate)
+        optimizer_g = Adam(params=filter(lambda p: p.requires_grad, self.generator.parameters()), lr=learning_rate)
         scheduler_g = MultiStepLR(optimizer_g, milestones=[epochs // 2], gamma=0.1)
 
         # Initialize discriminator's optimizer
@@ -134,7 +134,7 @@ class SRGAN(SuperResolutionModel):
             running_adversarial_loss_g = 0.0
             running_content_loss_g = 0.0
 
-            self.generator.model.train()
+            self.generator.train()
             self.discriminator.train()
 
             total_batch = len(data_loader)
@@ -146,7 +146,7 @@ class SRGAN(SuperResolutionModel):
                 lr_images = lr_images.to(device)
                 hr_images = hr_images.to(device)
 
-                sr_images = self.generator.model(lr_images)  # Super resolution images in [0, 1].
+                sr_images = self.generator(lr_images)  # Super resolution images in [0, 1].
 
                 # GENERATOR
                 # Calculate VGG feature maps for the super-resolved (SR) and high resolution (HR) images
@@ -169,7 +169,7 @@ class SRGAN(SuperResolutionModel):
                 # Step: update model parameters.
                 if ((i_batch + 1) % accumulation_steps == 0) or (i_batch + 1 == len(data_loader)):
                     optimizer_g.step()
-                    self.generator.model.zero_grad(set_to_none=True)
+                    self.generator.zero_grad(set_to_none=True)
 
                 # DISCRIMINATOR
                 hr_discriminated = self.discriminator(hr_images)
@@ -280,7 +280,7 @@ class SRGAN(SuperResolutionModel):
             print("Images won't be saved. To save images, please specify a save folder path.")
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        self.generator.model.to(device)
+        self.generator.to(device)
 
         all_psnr = []
         all_ssim = []
@@ -298,14 +298,14 @@ class SRGAN(SuperResolutionModel):
 
         start = time()
 
-        self.generator.model.eval()
+        self.generator.eval()
 
         with torch.no_grad():
 
             for i_batch, (lr_images, hr_images) in enumerate(data_loader):
                 lr_images = lr_images.to(device)
                 hr_images = hr_images.to(device)
-                sr_images = self.generator.model(lr_images)  # Super resolution images.
+                sr_images = self.generator(lr_images)  # Super resolution images.
 
                 # Save images.
                 for i in range(sr_images.size(0)):
@@ -363,8 +363,8 @@ class SRGAN(SuperResolutionModel):
         """
         # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')  #TODO gpu
         device = torch.device('cpu')
-        self.generator.model.to(device)
-        self.generator.model.eval()
+        self.generator.to(device)
+        self.generator.eval()
 
         data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
         predictions = []
@@ -372,7 +372,7 @@ class SRGAN(SuperResolutionModel):
         with torch.no_grad():  # TODO prediction on full size image
             for i_batch, (lr_images, hr_images) in enumerate(data_loader):
                 hr_images = hr_images.to(device)
-                sr_images = self.generator.model(hr_images)
+                sr_images = self.generator(hr_images)
 
                 # Saving images
                 for i in range(sr_images.size(0)):
