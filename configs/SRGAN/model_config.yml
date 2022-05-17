@@ -19,4 +19,5 @@ pretrained_generator_path: 'models/super_resolution/SRResNet/training_V3/best_ge
 # Hyperparameters
 batch_size: 32
 nb_epoch: 52
-lr: 1e-4  # float is returned as a string!
+grad_accumulation_steps: 1
+learning_rate: 1e-4  # float is returned as a string!

@@ -5,18 +5,16 @@ from copy import deepcopy
 from time import time
 from typing import Dict, List, Tuple, Optional, Union
 
-import numpy as np
 import torch
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from torch.nn import MSELoss, BCEWithLogitsLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILImage
 from torchvision.transforms import Normalize
-from torchvision.transforms.functional import to_pil_image
 from torchvision.utils import save_image, make_grid
-from torch.utils.tensorboard import SummaryWriter
 
 from discriminator import Discriminator
 from generator import Generator

@@ -1,4 +1,5 @@
 """Generator model."""
+
 import math
 import os
 from datetime import datetime
