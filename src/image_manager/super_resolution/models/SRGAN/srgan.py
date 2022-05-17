@@ -217,7 +217,7 @@ class SRGAN(SuperResolutionModel):
                     running_adversarial_loss_g += adversarial_loss_g.item()
                     running_content_loss_g += content_loss_g.item()
 
-            losses_epoch["adversarial_loss_discriminator"].append(running_adversarial_loss_d / len(data_loader))
+            losses_epoch["adversarial_loss_discriminator"].append(running_adversarial_loss_d / len(data_loader))  #TODO / acc step
             losses_epoch["adversarial_loss_generator"].append(running_adversarial_loss_g / len(data_loader))
             losses_epoch["content_loss_generator"].append(running_content_loss_g / len(data_loader))
 

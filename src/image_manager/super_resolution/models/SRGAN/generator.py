@@ -21,7 +21,7 @@ from utils_model import ConvolutionalBlock, ResidualBlock, SubPixelConvolutional
 import shutil
 
 
-class SRResNet(nn.Module):
+class SRResNet(nn.Module):  #TODO rename to generator
     """The Super resolution ResNet model"""
 
     def __init__(self, large_kernel_size: int = 9, small_kernel_size: int = 3, n_channels: int = 64, n_blocks: int = 16,
@@ -92,7 +92,7 @@ class SRResNet(nn.Module):
         return (output + 1.) / 2.  # Scale output from [-1, 1] to [0, 1], as we use 'Prelu' on previous layers.
 
 
-class Generator(nn.Module):
+class Generator(nn.Module):  #TODO rename to srresnet
     """
     The generator model.
     """
