@@ -3,7 +3,7 @@ import math
 import os
 from datetime import datetime
 from time import time
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Union
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILImage, Normalize
 from torch.utils.tensorboard import SummaryWriter
@@ -13,7 +13,6 @@ import torch
 from torch import nn, tensor
 from torch.nn import MSELoss
 from torch.optim import Adam
-from torch.optim.lr_scheduler import CyclicLR, MultiStepLR
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image, make_grid
 from src.image_manager.super_resolution.super_resolution_data import SuperResolutionData
@@ -21,8 +20,8 @@ from utils_model import ConvolutionalBlock, ResidualBlock, SubPixelConvolutional
 import shutil
 
 
-class SRResNet(nn.Module):  #TODO rename to generator
-    """The Super resolution ResNet model"""
+class Generator(nn.Module):
+    """ The generator model."""
 
     def __init__(self, large_kernel_size: int = 9, small_kernel_size: int = 3, n_channels: int = 64, n_blocks: int = 16,
                  scaling_factor: int = 4):
@@ -92,10 +91,8 @@ class SRResNet(nn.Module):  #TODO rename to generator
         return (output + 1.) / 2.  # Scale output from [-1, 1] to [0, 1], as we use 'Prelu' on previous layers.
 
 
-class Generator(nn.Module):  #TODO rename to srresnet
-    """
-    The generator model.
-    """
+class SRResNet(nn.Module):
+    """The Super resolution ResNet model."""
 
     def __init__(self, large_kernel_size: int = 9, small_kernel_size: int = 3, n_channels: int = 64, n_blocks: int = 16,
                  scaling_factor: int = 4):
@@ -117,7 +114,7 @@ class Generator(nn.Module):  #TODO rename to srresnet
             The factor to scale input images by (along both dimensions) in the subpixel convolutional block.
         """
         super().__init__()
-        self.model = SRResNet(large_kernel_size, small_kernel_size, n_channels, n_blocks, scaling_factor)
+        self.generator = Generator(large_kernel_size, small_kernel_size, n_channels, n_blocks, scaling_factor)
 
     def train(self, train_dataset: SuperResolutionData, val_dataset: SuperResolutionData, epochs: int,
               save_folder_model: str = "", save_folder_images: str = "", batch_size: int = 16,
@@ -161,7 +158,7 @@ class Generator(nn.Module):  #TODO rename to srresnet
         writer = SummaryWriter(os.path.join("samples", "logs", "Generator"))
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        self.model.to(device)
+        self.generator.to(device)
 
         # Compute three losses to monitor the training: train loss (batch and epoch) and validation loss (epoch)
         losses_epoch = {"train": [],
@@ -179,7 +176,7 @@ class Generator(nn.Module):  #TODO rename to srresnet
                                  persistent_workers=True)
 
         # Initialize generator's optimizer
-        optimizer = Adam(params=filter(lambda p: p.requires_grad, self.model.parameters()), lr=learning_rate)
+        optimizer = Adam(params=filter(lambda p: p.requires_grad, self.generator.parameters()), lr=learning_rate)
 
         # Generator loss
         content_loss = MSELoss().to(device)
@@ -191,7 +188,7 @@ class Generator(nn.Module):  #TODO rename to srresnet
 
             running_loss = 0.0
 
-            self.model.train()
+            self.generator.train()
 
             total_batch = len(data_loader)
 
@@ -202,7 +199,7 @@ class Generator(nn.Module):  #TODO rename to srresnet
                 lr_images = lr_images.to(device)  # In [0, 1] then normalized
                 hr_images = hr_images.to(device)  # In [0, 1]
 
-                sr_images = self.model(lr_images)  # Super resolution images.
+                sr_images = self.generator(lr_images)  # Super resolution images.
 
                 loss = content_loss(sr_images, hr_images)  # MSE.
 
@@ -243,11 +240,11 @@ class Generator(nn.Module):  #TODO rename to srresnet
 
             if losses_epoch["val"][-1] < best_val_loss and save_folder_model:
                 best_val_loss = losses_epoch["val"][-1]
-                torch.save(self.state_dict(), os.path.join(save_folder_model,
+                torch.save(self.generator.state_dict(), os.path.join(save_folder_model,
                                                            f"best_generator_epoch_{epoch + 1}.torch"))
 
         if save_folder_model:
-            torch.save(self.state_dict(),  # TODO self.model.state_dict ?
+            torch.save(self.generator.state_dict(),
                        os.path.join(save_folder_model, f'final_generator{datetime.now().strftime("%Y%m%d%H%M")}.torch'))
 
         return losses_batch, losses_epoch, metrics
@@ -283,7 +280,7 @@ class Generator(nn.Module):  #TODO rename to srresnet
             print("Images won't be saved. To save images, please specify a save folder path.")
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        self.model.to(device)
+        self.generator.to(device)
 
         all_psnr = []
         all_ssim = []
@@ -295,7 +292,7 @@ class Generator(nn.Module):  #TODO rename to srresnet
 
         # reverse normalization of lr_images
         reverse_normalize = Normalize(mean=[-0.475 / 0.262, -0.434 / 0.252, -0.392 / 0.262],
-                                      std=[1 / 0.262, 1 / 0.252, 1 / 0.262])  #TODO parameter
+                                      std=[1 / 0.262, 1 / 0.252, 1 / 0.262])  # TODO parameter
         transform = Compose([ToPILImage(), Resize(400), CenterCrop(400), ToTensor()])
 
         data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4,
@@ -305,12 +302,12 @@ class Generator(nn.Module):  #TODO rename to srresnet
         start = time()
 
         with torch.no_grad():
-            self.model.eval()
+            self.generator.eval()
 
             for i_batch, (lr_images, hr_images) in enumerate(data_loader):
                 lr_images = lr_images.to(device)
                 hr_images = hr_images.to(device)
-                sr_images = self.model(lr_images)  # Super resolution images.
+                sr_images = self.generator(lr_images)  # Super resolution images.
 
                 loss = content_loss(sr_images, hr_images)  # MSE.
                 val_losses.append(loss)
@@ -355,3 +352,25 @@ class Generator(nn.Module):  #TODO rename to srresnet
                       f'- Duration {time() - start:.1f} s\r', end="")
 
         return sum(val_losses) / len(val_losses), sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
+
+    def load(self, generator: Union[Generator, str]):
+        """
+        Load a pretrained model.
+
+        Parameters
+        ----------
+        generator: Union[Generator, str]
+            A path to a pretrained model, or a torch model.
+
+        Raises
+        ------
+        TypeError
+            If 'generator' type is not a string or a model.
+
+        """
+        if isinstance(generator, str):
+            self.generator.load_state_dict(torch.load(generator))  # From path
+        elif isinstance(generator, type(self.generator)):
+            self.generator.load_state_dict(generator.state_dict())
+        else:
+            raise TypeError("Generator argument must be either a path to a trained model, or a trained model.")
