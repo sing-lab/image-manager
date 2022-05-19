@@ -118,10 +118,9 @@ class SRResNet(nn.Module):
         self.generator = Generator(large_kernel_size, small_kernel_size, n_channels, n_blocks, scaling_factor)
 
     def train(self, train_dataset: SuperResolutionData, val_dataset: SuperResolutionData, epochs: int,
-              save_folder_model: str = "", save_folder_images: str = "", batch_size: int = 16,
-              learning_rate: float = 1e-4) \
-            -> Tuple[Dict[str, List], Dict[str, List], Dict[str, List]]:
-        """  #TODO implement better metric tracking (class)
+              experiment_name: str, save_folder_model: str = "", save_folder_images: str = "", batch_size: int = 16,
+              learning_rate: float = 1e-4) -> None:
+        """
         Generator can be trained before training the full GAN model to optimize convergence.
         Divide learning rate by 10 at mid training.
 
@@ -133,6 +132,8 @@ class SRResNet(nn.Module):
             Dataset used for validation.
         epochs: int
             Number of epochs
+        experiment_name: str
+            Name of the experiment.
         save_folder_model: str, default ""
             Folder where to save the best model. If empty, the model won't be saved
         save_folder_images: str, default ""
@@ -142,11 +143,6 @@ class SRResNet(nn.Module):
         learning_rate: float, default 1e-4
             Learning rate used for training
 
-        Returns
-        -------
-        Tuple[Dict[str, List], Dict[str, List], Dict[str, List]]
-            list of training losses for each mini-batch, list of training losses for each epoch, list of metrics for
-            each epoch (val set).
         """
         if save_folder_model:
             if os.path.exists(save_folder_model):
@@ -156,20 +152,10 @@ class SRResNet(nn.Module):
             print("Model won't be saved. To save the model, please specify a save folder path.")
 
         # Create training process log file.
-        writer = SummaryWriter(os.path.join("samples", "logs", "Generator"))
+        writer = SummaryWriter(os.path.join("samples", "logs", experiment_name))
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         self.generator.to(device)
-
-        # Compute three losses to monitor the training: train loss (batch and epoch) and validation loss (epoch)
-        losses_epoch = {"train": [],
-                        "val": []}
-
-        losses_batch = {"train": []}
-
-        # Compute PSNR and SSIM on validation set for each epoch.
-        metrics = {"PSNR": [],
-                   "SSIM": []}
 
         best_val_loss = np.inf
 
@@ -220,38 +206,36 @@ class SRResNet(nn.Module):
                 iteration = i_batch + epoch * total_batch + 1
                 writer.add_scalar("Train/generator_loss", loss.item(), iteration)
 
-                losses_batch["train"].append(loss.item())
                 running_loss += loss.item()
-
-            losses_epoch["train"].append(running_loss / len(data_loader))
 
             val_loss, psnr, ssim = self.evaluate(val_dataset,
                                                  batch_size=1,  # val images can have different size.
                                                  save_folder_images=save_folder_images + "_epoch_" + str(epoch + 1))
-            losses_epoch["val"].append(val_loss)
-            metrics["PSNR"].append(psnr)
-            metrics["SSIM"].append(ssim)
+
+            writer.add_scalar("Val/PSNR", psnr, epoch + 1)
+            writer.add_scalar("Val/SSIM", ssim, epoch + 1)
+            writer.add_scalar("Val/Loss", val_loss, epoch + 1)
 
             print(f'Epoch {epoch + 1}/{epochs} '
-                  f'- Train loss: {losses_epoch["train"][-1]:.4f}'
-                  f'- Val Loss: {losses_epoch["val"][-1]:.4f}',
+                  f'- Train loss: {running_loss / len(data_loader):.4f}'
+                  f'- Val Loss: {val_loss:.4f}',
                   f'- PSNR: {psnr:.2f} '
                   f'- SSIM: {ssim:.2f} '
                   f'- Duration {time() - start:.1f} s')
 
-            if losses_epoch["val"][-1] < best_val_loss and save_folder_model:
-                best_val_loss = losses_epoch["val"][-1]
+            if val_loss < best_val_loss and save_folder_model:
+                best_val_loss = val_loss
                 torch.save(self.generator.state_dict(), os.path.join(save_folder_model,
-                                                           f"best_generator_epoch_{epoch + 1}.torch"))
+                                                                     f"best_generator_epoch_{epoch + 1}.torch"))
 
         if save_folder_model:
             torch.save(self.generator.state_dict(),
                        os.path.join(save_folder_model, f'final_generator{datetime.now().strftime("%Y%m%d%H%M")}.torch'))
 
-        return losses_batch, losses_epoch, metrics
+        return
 
-    def evaluate(self, val_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "") \
-            -> Tuple[float, float, float]:
+    def evaluate(self, val_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "",
+                 reverse_normalize: bool = True) -> Tuple[float, float, float]:
         """
         Main function to test the model, using PSNR and SSIM.
         No validation data should be provided as GAN cannot be monitored using a validation loss.
@@ -267,6 +251,8 @@ class SRResNet(nn.Module):
             batch size for evaluation.
         save_folder_images: str, default ""
             Folder to save generated images.
+        reverse_normalize: bool, default True
+            Whether to reverse image normalization before saving images or not.
 
         Returns
         -------
@@ -291,9 +277,11 @@ class SRResNet(nn.Module):
 
         rgb_weights = torch.FloatTensor([65.481, 128.553, 24.966]).to(device)
 
-        # reverse normalization of lr_images
-        reverse_normalize = Normalize(mean=[-0.475 / 0.262, -0.434 / 0.252, -0.392 / 0.262],
-                                      std=[1 / 0.262, 1 / 0.252, 1 / 0.262])  # TODO parameter
+        # Reverse normalization of lr_images
+        if reverse_normalize:
+            denormalize = Normalize(mean=[-0.475 / 0.262, -0.434 / 0.252, -0.392 / 0.262],
+                                    std=[1 / 0.262, 1 / 0.252, 1 / 0.262])
+
         transform = Compose([ToPILImage(), Resize(400), CenterCrop(400), ToTensor()])
 
         data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4,
@@ -316,7 +304,11 @@ class SRResNet(nn.Module):
                 # Save images.
                 if save_folder_images and i_batch % (total_batch // 10) == 0:
                     for i in range(sr_images.size(0)):
-                        images = torch.stack([transform(reverse_normalize(lr_images[i, :, :, :])),
+
+                        if reverse_normalize:
+                            lr_images[i, :, :, :] = denormalize(lr_images[i, :, :, :])
+
+                        images = torch.stack([transform(lr_images[i, :, :, :]),
                                               transform(sr_images[i, :, :, :]),
                                               transform(hr_images[i, :, :, :])])
                         grid = make_grid(images, nrow=3, padding=5)
@@ -350,6 +342,60 @@ class SRResNet(nn.Module):
                       f'- Duration {time() - start:.1f} s\r', end="")
 
         return sum(val_losses) / len(val_losses), sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
+
+    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "") -> None:
+        """
+        Process an image into super resolution.
+        We use high resolution images as input, therefore test_dataset should have parameter normalize_hr set to True.
+
+        Parameters
+        ----------
+        test_dataset: SuperResolutionData
+            The images to process.
+        batch_size: int, default 16
+            The batch size for predictions.
+        save_folder_images: str
+            The folder where to save predicted images.
+
+        """
+        if save_folder_images:
+            if os.path.exists(save_folder_images):
+                shutil.rmtree(save_folder_images, ignore_errors=True)
+            os.makedirs(save_folder_images)
+        else:
+            print("Images won't be saved. To save images, please specify a save folder path.")
+
+        if not test_dataset.normalize_hr:
+            print("Warning! As we use high resolution images as model input, test_dataset should have 'normalize_hr' "
+                  "set to True (currently False).")
+
+        # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        device = torch.device('cpu')  # TODO remove
+        self.generator.to(device)
+        self.generator.eval()
+
+        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+        total_batch = len(data_loader)
+
+        start = time()
+
+        with torch.no_grad():
+            for i_batch, (lr_images, hr_images) in enumerate(data_loader):
+                hr_images = hr_images.to(device)
+                sr_images = self.generator(hr_images)
+
+                # Save images
+                if save_folder_images:
+                    for i in range(sr_images.size(0)):
+                        save_image(sr_images[i, :, :, :],
+                                   os.path.join(save_folder_images, f'{i_batch * batch_size + i}.png'))
+
+                print(f'{i_batch + 1}/{total_batch} '
+                      f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
+                      f'{"-" * int(40 - 40 * (i_batch + 1) / total_batch)}] '
+                      f'- Duration {time() - start:.1f} s\r', end="")
+
+        return
 
     def load(self, generator: Union[Generator, str]):
         """

@@ -16,7 +16,7 @@ class SuperResolutionData(Dataset):
     """
 
     def __init__(self, image_folder: str, is_train_split: bool = False, crop_size: int = 96, scaling_factor: int = 4,
-                 normalize: bool = True):
+                 normalize_lr: bool = True, normalize_hr: bool = False):
         """
 
         Parameters
@@ -27,7 +27,9 @@ class SuperResolutionData(Dataset):
             The target size for high resolution images for train set. Test set: images are not cropped to a fixed size.
         scaling_factor: int, default 4
             The scaling factor to use when downscaling high resolution images into low resolution images.
-        normalize: bool, default True
+        normalize_lr: bool, default True
+            Whether to normalize images (using imageNET statistics as we use similar images) or not.
+        normalize_hr: bool, default False
             Whether to normalize images (using imageNET statistics as we use similar images) or not.
         is_train_split: bool, default False
             Whether the current split it a train split (test and validation data should not use RandomCrop).
@@ -47,8 +49,12 @@ class SuperResolutionData(Dataset):
         self.image_folder = image_folder
         self.crop_size = crop_size
         self.scaling_factor = scaling_factor
-        self.normalize = normalize
         self.is_train_split = is_train_split
+        self.normalize_lr = normalize_lr
+        self.normalize_hr = normalize_hr
+
+        # Normalize images using ImageNET dataset statistics.
+        self.normalize = Normalize(mean=[0.475, 0.434, 0.392], std=[0.262, 0.252, 0.262])
 
     def __getitem__(self, idx: int) -> Tuple[tensor, tensor]:
         """
@@ -89,10 +95,11 @@ class SuperResolutionData(Dataset):
 
         low_res_image = transform_lr(high_res_image)
 
-        if self.normalize:
-            # Normalize images using ImageNET dataset statistics.
-            normalize = Normalize(mean=[0.475, 0.434, 0.392], std=[0.262, 0.252, 0.262])  # Computed stats
-            low_res_image = normalize(low_res_image)
+        if self.normalize_lr:
+            low_res_image = self.normalize(low_res_image)
+
+        if self.normalize_hr:
+            high_res_image = self.normalize(high_res_image)
 
         return low_res_image, high_res_image
 

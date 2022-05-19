@@ -1,9 +1,8 @@
 """SRGAN model implementation"""
 import os
 import shutil
-from copy import deepcopy
 from time import time
-from typing import Dict, List, Tuple, Optional, Union
+from typing import Tuple, Optional, Union
 
 import torch
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
@@ -44,10 +43,9 @@ class SRGAN(SuperResolutionModel):
         self.truncated_vgg = truncated_vgg
 
     def train(self, train_dataset: SuperResolutionData, val_dataset: SuperResolutionData, epochs: int,
-              save_folder_model: str = "", save_folder_images: str = "", batch_size: int = 16,
-              accumulation_steps: int = 1, learning_rate: float = 1e-4, beta_loss: float = 1e-3) \
-            -> Tuple[Dict[str, List], Dict[str, List], Dict[str, List]]:
-        """  #TODO implement better metric tracking (class)
+              experiment_name: str, save_folder_model: str = "", save_folder_images: str = "", batch_size: int = 16,
+              learning_rate: float = 1e-4, beta_loss: float = 1e-3) -> None:
+        """
         Main function to train the model and save the final model.
         Divide learning rate by 10 at mid training.
 
@@ -59,24 +57,19 @@ class SRGAN(SuperResolutionModel):
             Dataset used for validation.
         epochs: int
             Number of epochs
+        experiment_name: str
+            Name of the experiment.
         save_folder_model: str, default ""
             Folder where to save the best model. If empty, the model won't be saved
         save_folder_images: str, default ""
             Folder where to save validation images (low, high and super resolution) at each validation step.
         batch_size: int, default 16
             Batch size for training
-        accumulation_steps: int, default 1
-            Number of accumulation steps for the gradient.
         learning_rate: float, default 1e-4
             Learning rate used for training
         beta_loss: float, default 1e-3
             The coefficient to weight the adversarial loss in the perceptual loss.
 
-        Returns
-        -------
-        Tuple[Dict[str, List], Dict[str, List], Dict[str, List]]
-            list of training losses for each mini-batch, list of training losses for each epoch, list of metrics for
-            each epoch (val set).
         """
         if save_folder_model:
             if os.path.exists(save_folder_model):
@@ -85,8 +78,8 @@ class SRGAN(SuperResolutionModel):
         else:
             print("Model won't be saved. To save the model, please specify a save folder path.")
 
-        # Create training process log file.
-        writer = SummaryWriter(os.path.join("samples", "logs", "GAN"))
+        # Create log file to monitore training and evaluation.
+        writer = SummaryWriter(os.path.join("samples", "logs", experiment_name))
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         self.generator.to(device)
@@ -94,17 +87,6 @@ class SRGAN(SuperResolutionModel):
 
         self.truncated_vgg.to(device)
         self.truncated_vgg.eval()  # Used to compute the content loss only.
-
-        # Compute train loss by batch and by epoch to monitor the training.
-        losses_epoch = {"adversarial_loss_discriminator": [],
-                        "adversarial_loss_generator": [],
-                        "content_loss_generator": []}
-
-        # Compute PSNR and SSIM on validation set for each epoch.
-        metrics = {"PSNR": [],
-                   "SSIM": []}
-
-        losses_batch = deepcopy(losses_epoch)
 
         data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4,
                                  persistent_workers=True)
@@ -138,9 +120,8 @@ class SRGAN(SuperResolutionModel):
             total_batch = len(data_loader)
 
             # lr/hr/sr: low/high/super resolution
-
+            # Training step.
             for i_batch, (lr_images, hr_images) in enumerate(data_loader):
-
                 lr_images = lr_images.to(device)
                 hr_images = hr_images.to(device)
 
@@ -158,80 +139,71 @@ class SRGAN(SuperResolutionModel):
                 # MSE on VGG space + MSE on real space.  MSE on raw images != MSE on normalized images.
                 content_loss_g = content_loss(sr_images_vgg, hr_images_vgg)
                 adversarial_loss_g = adversarial_loss(sr_discriminated, torch.ones_like(sr_discriminated))
-                perceptual_loss_g = content_loss_g + beta_loss*adversarial_loss_g
-                perceptual_loss_g /= accumulation_steps
+                perceptual_loss_g = content_loss_g + beta_loss * adversarial_loss_g
 
                 # Backward step: compute gradients.
                 perceptual_loss_g.backward()
 
                 # Step: update model parameters.
-                if ((i_batch + 1) % accumulation_steps == 0) or (i_batch + 1 == len(data_loader)):
-                    optimizer_g.step()
-                    self.generator.zero_grad(set_to_none=True)
+                optimizer_g.step()
+                self.generator.zero_grad(set_to_none=True)
 
                 # DISCRIMINATOR
                 hr_discriminated = self.discriminator(hr_images)
                 sr_discriminated = self.discriminator(sr_images.detach().clone())
                 # Don't use previous sr_discriminated because it would also update generator parameters.
 
-                # torch.sigmoid_(torch.mean(hr_discriminated.detach())): prob of hr
-                # torch.sigmoid_(torch.mean(sr_discriminated.detach())) : prob of sr
+                d_sr_probability = torch.sigmoid_(torch.mean(sr_discriminated.detach()))  # prob of sr
+                d_hr_probability = torch.sigmoid_(torch.mean(hr_discriminated.detach()))  # prob of hr
 
                 # # Binary Cross-Entropy loss
                 adversarial_loss_d = adversarial_loss(sr_discriminated, torch.zeros_like(sr_discriminated)) + \
                                      adversarial_loss(hr_discriminated, torch.ones_like(hr_discriminated))
-                adversarial_loss_d /= accumulation_steps
 
                 # Backward step: compute gradients.
                 adversarial_loss_d.backward()
 
                 # Step: update model parameters.
-                if ((i_batch + 1) % accumulation_steps == 0) or (i_batch + 1 == len(data_loader)):
-                    optimizer_d.step()
-                    self.discriminator.zero_grad(set_to_none=True)
+                optimizer_d.step()
+                self.discriminator.zero_grad(set_to_none=True)
 
-                    print(f'{i_batch + 1}/{total_batch} '
-                          f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
-                          f'{"-" * int(40 - 40 * (i_batch + 1) / total_batch)}] '
-                          f'- Loss generator (adversarial) {adversarial_loss_g.item():.4f} '
-                          f'- Loss generator (content) {content_loss_g.item():.4f} '
-                          f'- Loss discriminator (adversarial) {adversarial_loss_d.item():.4f} '
-                          f'- Duration {time() - start:.1f} s\r', end="")
+                print(f'{i_batch + 1}/{total_batch} '
+                      f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
+                      f'{"-" * int(40 - 40 * (i_batch + 1) / total_batch)}] '
+                      f'- Loss generator (adversarial) {adversarial_loss_g.item():.4f} '
+                      f'- Loss generator (content) {content_loss_g.item():.4f} '
+                      f'- Loss discriminator (adversarial) {adversarial_loss_d.item():.4f} '
+                      f'- Duration {time() - start:.1f} s\r', end="")
 
-                    # Save logs for tensorboard.
-                    iteration = i_batch + epoch * total_batch + 1
-                    writer.add_scalar("Train/discriminator_loss", adversarial_loss_d.item(), iteration)
-                    writer.add_scalar("Train/generator_content_loss", content_loss_g.item(), iteration)
-                    writer.add_scalar("Train/generator_adversarial_loss", adversarial_loss_g.item(), iteration)
-                    writer.add_scalar("Train/generator_total_loss", content_loss_g.item() + adversarial_loss_g.item(),
-                                      iteration)
-                    #TODO add probabilities hr sr
+                # Save logs for tensorboard.
+                iteration = (i_batch + epoch * total_batch + 1)
+                writer.add_scalar("Train/discriminator_total_loss", adversarial_loss_d.item(), iteration)
+                writer.add_scalar("Train/generator_content_loss", content_loss_g.item(), iteration)
+                writer.add_scalar("Train/generator_adversarial_loss", adversarial_loss_g.item(), iteration)
+                writer.add_scalar("Train/generator_total_loss", content_loss_g.item() + adversarial_loss_g.item(),
+                                  iteration)
+                writer.add_scalar("Train/discriminator_hr_probability", d_hr_probability, iteration)
+                writer.add_scalar("Train/discriminator_sr_probability", d_sr_probability, iteration)
 
-                    losses_batch["adversarial_loss_discriminator"].append((adversarial_loss_d.item()))
-                    losses_batch["adversarial_loss_generator"].append(adversarial_loss_g.item())
-                    losses_batch["content_loss_generator"].append(content_loss_g.item())
-
-                    running_adversarial_loss_d += adversarial_loss_d.item()
-                    running_adversarial_loss_g += adversarial_loss_g.item()
-                    running_content_loss_g += content_loss_g.item()
-
-            losses_epoch["adversarial_loss_discriminator"].append(running_adversarial_loss_d / len(data_loader))  #TODO / acc step
-            losses_epoch["adversarial_loss_generator"].append(running_adversarial_loss_g / len(data_loader))
-            losses_epoch["content_loss_generator"].append(running_content_loss_g / len(data_loader))
+                running_adversarial_loss_d += adversarial_loss_d.item()
+                running_adversarial_loss_g += adversarial_loss_g.item()
+                running_content_loss_g += content_loss_g.item()
 
             scheduler_g.step()
             scheduler_d.step()
 
+            # Evaluation step.
             psnr, ssim = self.evaluate(val_dataset,
                                        batch_size=1,
-                                       save_folder_images=save_folder_images + "_epoch_" + str(epoch + 1))
-            metrics["PSNR"].append(psnr)
-            metrics["SSIM"].append(ssim)
+                                       save_folder_images=f"{save_folder_images}_epoch_{str(epoch + 1)}")
+
+            writer.add_scalar("Val/PSNR", psnr, epoch + 1)
+            writer.add_scalar("Val/SSIM", ssim, epoch + 1)
 
             print(f'Epoch {epoch + 1}/{epochs} '
-                  f'- Loss generator (adversarial): {losses_epoch["adversarial_loss_generator"][-1]:.4f} '
-                  f'- Loss discriminator (adversarial): {losses_epoch["adversarial_loss_discriminator"][-1]:.4f} '
-                  f'- Loss generator (content): {losses_epoch["content_loss_generator"][-1]:.4f} '
+                  f'- Loss generator (adversarial): {running_adversarial_loss_g / len(data_loader):.4f} '
+                  f'- Loss discriminator (adversarial): {running_adversarial_loss_d / len(data_loader):.4f} '
+                  f'- Loss generator (content): {running_content_loss_g / len(data_loader):.4f} '
                   f'- PSNR: {psnr:.2f} '
                   f'- SSIM: {ssim:.2f} '
                   f'- Duration {time() - start:.1f} s')
@@ -245,10 +217,10 @@ class SRGAN(SuperResolutionModel):
             # Free some memory since their histories may be stored
             del lr_images, hr_images, sr_images, hr_images_vgg, sr_images_vgg, hr_discriminated, sr_discriminated
 
-        return losses_batch, losses_epoch, metrics
+        return
 
-    def evaluate(self, val_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "") \
-            -> Tuple[float, float]:
+    def evaluate(self, val_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "",
+                 reverse_normalize: bool = True) -> Tuple[float, float]:
         """
         Main function to test the model, using PSNR and SSIM.
         No validation data should be provided as GAN cannot be monitored using a validation loss.
@@ -264,6 +236,8 @@ class SRGAN(SuperResolutionModel):
             batch size for evaluation.
         save_folder_images: str, default ""
             Folder to save generated images.
+        reverse_normalize: bool, default True
+            Whether to reverse image normalization before saving images or not.
 
         Returns
         -------
@@ -285,9 +259,11 @@ class SRGAN(SuperResolutionModel):
 
         rgb_weights = torch.FloatTensor([65.481, 128.553, 24.966]).to(device)
 
-        # reverse normalization of lr_images
-        reverse_normalize = Normalize(mean=[-0.475 / 0.262, -0.434 / 0.252, -0.392 / 0.262],
-                                      std=[1 / 0.262, 1 / 0.252, 1 / 0.262])
+        # Reverse normalization of lr_images
+        if reverse_normalize:
+            denormalize = Normalize(mean=[-0.475 / 0.262, -0.434 / 0.252, -0.392 / 0.262],
+                                    std=[1 / 0.262, 1 / 0.252, 1 / 0.262])
+
         transform = Compose([ToPILImage(), Resize(400), CenterCrop(400), ToTensor()])
 
         data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4,
@@ -308,7 +284,10 @@ class SRGAN(SuperResolutionModel):
                 # Save images.
                 if save_folder_images and i_batch % (total_batch // 10) == 0:
                     for i in range(sr_images.size(0)):
-                        images = torch.stack([transform(reverse_normalize(lr_images[i, :, :, :])),
+                        if reverse_normalize:
+                            lr_images[i, :, :, :] = denormalize(lr_images[i, :, :, :])
+
+                        images = torch.stack([transform(lr_images[i, :, :, :]),
                                               transform(sr_images[i, :, :, :]),
                                               transform(hr_images[i, :, :, :])])
                         grid = make_grid(images, nrow=3, padding=5)
@@ -345,12 +324,13 @@ class SRGAN(SuperResolutionModel):
     def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "") -> None:
         """
         Process an image into super resolution.
+        We use high resolution images as input, therefore test_dataset should have parameter normalize_hr set to True.
 
         Parameters
         ----------
         test_dataset: SuperResolutionData
             The images to process.
-        batch_size: int, default 16
+        batch_size: int, default 1
             The batch size for predictions.
         save_folder_images: str
             The folder where to save predicted images.
@@ -363,18 +343,22 @@ class SRGAN(SuperResolutionModel):
         else:
             print("Images won't be saved. To save images, please specify a save folder path.")
 
+        if not test_dataset.normalize_hr:
+            print("Warning! As we use high resolution images as model input, test_dataset should have 'normalize_hr' "
+                  "set to True (currently False).")
+
         # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        device = torch.device('cpu')  #TODO remove
+        device = torch.device('cpu')  # TODO remove
         self.generator.to(device)
         self.generator.eval()
 
         data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+        total_batch = len(data_loader)
 
-        normalize = Normalize(mean=[0.475, 0.434, 0.392], std=[0.262, 0.252, 0.262])  # Computed stats
+        start = time()
 
         with torch.no_grad():
             for i_batch, (lr_images, hr_images) in enumerate(data_loader):
-                hr_images = normalize(hr_images)
                 hr_images = hr_images.to(device)
                 sr_images = self.generator(hr_images)
 
@@ -383,6 +367,11 @@ class SRGAN(SuperResolutionModel):
                     for i in range(sr_images.size(0)):
                         save_image(sr_images[i, :, :, :],
                                    os.path.join(save_folder_images, f'{i_batch * batch_size + i}.png'))
+
+                print(f'{i_batch + 1}/{total_batch} '
+                      f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
+                      f'{"-" * int(40 - 40 * (i_batch + 1) / total_batch)}] '
+                      f'- Duration {time() - start:.1f} s\r', end="")
 
         return
 
@@ -420,12 +409,3 @@ class SRGAN(SuperResolutionModel):
             else:
                 raise TypeError("Generator argument must be either a path to a trained model, or a trained model.")
 
-    def test(self):
-        """
-        Test the model for benchmarking.
-
-        Returns
-        -------
-
-        """
-        pass
