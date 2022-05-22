@@ -1,22 +1,24 @@
-# Configuration file for training a SRGAN model.
+# Configuration file for training a pretrained (generator) SRGAN model.
 
-experiment_name: 'SRGAN/training_V1'
+experiment_name: 'SRGAN_training_V1'
+model_type: 'SRGAN'
+from_pretrained: 'True' # Use the pretrained generator model.
+task: 'train'  # in ('train', 'evaluate', 'predict')
 
-# Paths
-root_path: '../../../'
+paths:
+  #TODO add all training parameters to use **config["train_parameters"]. Put full paths.
 
-model_save_path: 'models/super_resolution/'
+  # Paths
+  model_save_folder: '../../../models/super_resolution/'
 
-train_data_input_path: 'data/raw/train'
-val_data_input_path: 'data/raw/val'
-test_data_input_path: 'data/raw/test'
+  train_images_input_path: '../../../data/raw/train'
+  val_images_input_path: '../../../data/raw/val'
+  test_images_input_path: '../../../data/raw/test'
 
-val_data_output_path: 'data/processed/val/'
-test_data_output_path: 'data/processed/test/'
+  val_images_save_folder: '../../../data/processed/val/'
+  test_images_save_folder: '../../../data/processed/test/'
 
-pretrained_generator_path: 'models/super_resolution/SRResNet/training_V3/best_generator_epoch_30.torch'
-
-# Hyperparameters
-batch_size: 4
-nb_epoch: 52
-learning_rate: 1e-4  # float is returned as a string!
+hyperparameters:
+  batch_size: 32
+  epochs: 52
+  learning_rate: 0.0001

@@ -15,14 +15,14 @@ from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILI
 from torchvision.transforms import Normalize
 from torchvision.utils import save_image, make_grid
 
-from discriminator import Discriminator
-from generator import Generator
+from models.SRGAN.discriminator import Discriminator
+from models.SRGAN.generator import Generator
 from src.image_manager.super_resolution.super_resolution_data import SuperResolutionData
-from src.image_manager.super_resolution.super_resolution_model_base import SuperResolutionModel
+from src.image_manager.super_resolution.models.super_resolution_model_base import SuperResolutionModelBase
 from utils_loss import TruncatedVGG
 
 
-class SRGAN(SuperResolutionModel):
+class SRGAN(SuperResolutionModelBase):
     """Super resolution with GAN model"""
 
     def __init__(self, discriminator: Discriminator, generator: Generator, truncated_vgg: TruncatedVGG):
@@ -43,7 +43,7 @@ class SRGAN(SuperResolutionModel):
         self.truncated_vgg = truncated_vgg
 
     def train(self, train_dataset: SuperResolutionData, val_dataset: SuperResolutionData, epochs: int,
-              experiment_name: str, save_folder_model: str = "", save_folder_images: str = "", batch_size: int = 16,
+              experiment_name: str, model_save_folder: str = "", images_save_folder: str = "", batch_size: int = 16,
               learning_rate: float = 1e-4, beta_loss: float = 1e-3) -> None:
         """
         Main function to train the model and save the final model.
@@ -59,9 +59,9 @@ class SRGAN(SuperResolutionModel):
             Number of epochs
         experiment_name: str
             Name of the experiment.
-        save_folder_model: str, default ""
+        model_save_folder: str, default ""
             Folder where to save the best model. If empty, the model won't be saved
-        save_folder_images: str, default ""
+        images_save_folder: str, default ""
             Folder where to save validation images (low, high and super resolution) at each validation step.
         batch_size: int, default 16
             Batch size for training
@@ -71,10 +71,10 @@ class SRGAN(SuperResolutionModel):
             The coefficient to weight the adversarial loss in the perceptual loss.
 
         """
-        if save_folder_model:
-            if os.path.exists(save_folder_model):
-                shutil.rmtree(save_folder_model, ignore_errors=True)
-            os.makedirs(save_folder_model)
+        if model_save_folder:
+            if os.path.exists(model_save_folder):
+                shutil.rmtree(model_save_folder, ignore_errors=True)
+            os.makedirs(model_save_folder)
         else:
             print("Model won't be saved. To save the model, please specify a save folder path.")
 
@@ -195,7 +195,7 @@ class SRGAN(SuperResolutionModel):
             # Evaluation step.
             psnr, ssim = self.evaluate(val_dataset,
                                        batch_size=1,
-                                       save_folder_images=f"{save_folder_images}_epoch_{str(epoch + 1)}")
+                                       images_save_folder=f"{images_save_folder}_epoch_{str(epoch + 1)}")
 
             writer.add_scalar("Val/PSNR", psnr, epoch + 1)
             writer.add_scalar("Val/SSIM", ssim, epoch + 1)
@@ -208,18 +208,18 @@ class SRGAN(SuperResolutionModel):
                   f'- SSIM: {ssim:.2f} '
                   f'- Duration {time() - start:.1f} s')
 
-            if save_folder_model:
+            if model_save_folder:
                 torch.save(self.discriminator.state_dict(),
-                           os.path.join(save_folder_model, f"discriminator_epoch_{epoch + 1}.torch"))
+                           os.path.join(model_save_folder, f"discriminator_epoch_{epoch + 1}.torch"))
                 torch.save(self.generator.state_dict(),
-                           os.path.join(save_folder_model, f"generator_epoch_{epoch + 1}.torch"))
+                           os.path.join(model_save_folder, f"generator_epoch_{epoch + 1}.torch"))
 
             # Free some memory since their histories may be stored
             del lr_images, hr_images, sr_images, hr_images_vgg, sr_images_vgg, hr_discriminated, sr_discriminated
 
         return
 
-    def evaluate(self, val_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "",
+    def evaluate(self, val_dataset: SuperResolutionData, batch_size: int = 1, images_save_folder: str = "",
                  reverse_normalize: bool = True) -> Tuple[float, float]:
         """
         Main function to test the model, using PSNR and SSIM.
@@ -234,7 +234,7 @@ class SRGAN(SuperResolutionModel):
             dataset to use for testing.
         batch_size: int, default 16
             batch size for evaluation.
-        save_folder_images: str, default ""
+        images_save_folder: str, default ""
             Folder to save generated images.
         reverse_normalize: bool, default True
             Whether to reverse image normalization before saving images or not.
@@ -244,10 +244,10 @@ class SRGAN(SuperResolutionModel):
         Tuple[float, float]
             Average PSNR and SSIM values.
         """
-        if save_folder_images:
-            if os.path.exists(save_folder_images):
-                shutil.rmtree(save_folder_images, ignore_errors=True)
-            os.makedirs(save_folder_images)
+        if images_save_folder:
+            if os.path.exists(images_save_folder):
+                shutil.rmtree(images_save_folder, ignore_errors=True)
+            os.makedirs(images_save_folder)
         else:
             print("Images won't be saved. To save images, please specify a save folder path.")
 
@@ -282,7 +282,7 @@ class SRGAN(SuperResolutionModel):
                 sr_images = self.generator(lr_images)  # Super resolution images.
 
                 # Save images.
-                if save_folder_images and i_batch % (total_batch // 10) == 0:
+                if images_save_folder and i_batch % (total_batch // 10) == 0:
                     for i in range(sr_images.size(0)):
                         if reverse_normalize:
                             lr_images[i, :, :, :] = denormalize(lr_images[i, :, :, :])
@@ -292,7 +292,7 @@ class SRGAN(SuperResolutionModel):
                                               transform(hr_images[i, :, :, :])])
                         grid = make_grid(images, nrow=3, padding=5)
                         save_image(grid,
-                                   os.path.join(save_folder_images, f'image_{i_batch * batch_size + i}.png'), padding=5)
+                                   os.path.join(images_save_folder, f'image_{i_batch * batch_size + i}.png'), padding=5)
 
                 hr_images = 255 * hr_images  # Map from [0, 1] to [0, 255]
                 sr_images = 255 * sr_images  # Map from [0, 1] to [0, 255]
@@ -321,7 +321,7 @@ class SRGAN(SuperResolutionModel):
 
         return sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
 
-    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, save_folder_images: str = "") -> None:
+    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, images_save_folder: str = "") -> None:
         """
         Process an image into super resolution.
         We use high resolution images as input, therefore test_dataset should have parameter normalize_hr set to True.
@@ -332,14 +332,14 @@ class SRGAN(SuperResolutionModel):
             The images to process.
         batch_size: int, default 1
             The batch size for predictions.
-        save_folder_images: str
+        images_save_folder: str
             The folder where to save predicted images.
 
         """
-        if save_folder_images:
-            if os.path.exists(save_folder_images):
-                shutil.rmtree(save_folder_images, ignore_errors=True)
-            os.makedirs(save_folder_images)
+        if images_save_folder:
+            if os.path.exists(images_save_folder):
+                shutil.rmtree(images_save_folder, ignore_errors=True)
+            os.makedirs(images_save_folder)
         else:
             print("Images won't be saved. To save images, please specify a save folder path.")
 
@@ -363,10 +363,10 @@ class SRGAN(SuperResolutionModel):
                 sr_images = self.generator(hr_images)
 
                 # Save images
-                if save_folder_images:
+                if images_save_folder:
                     for i in range(sr_images.size(0)):
                         save_image(sr_images[i, :, :, :],
-                                   os.path.join(save_folder_images, f'{i_batch * batch_size + i}.png'))
+                                   os.path.join(images_save_folder, f'{i_batch * batch_size + i}.png'))
 
                 print(f'{i_batch + 1}/{total_batch} '
                       f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'

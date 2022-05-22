@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 
 
-class SuperResolutionModel(ABC):
+class SuperResolutionModelBase(ABC):
     """Abstract class for models"""
 
     @abstractmethod
@@ -14,5 +14,9 @@ class SuperResolutionModel(ABC):
         pass
 
     @abstractmethod
-    def load(self):
+    def load(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def predict(self, *args, **kwargs):
         pass

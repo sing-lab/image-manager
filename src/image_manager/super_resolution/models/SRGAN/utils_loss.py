@@ -3,6 +3,7 @@ from torchvision import models
 from torch import nn, tensor
 from torchvision.transforms import Normalize
 
+
 class TruncatedVGG(nn.Module):
     """
     A truncated VGG19 network, such that its output is the 'feature map obtained by the j-th convolution
