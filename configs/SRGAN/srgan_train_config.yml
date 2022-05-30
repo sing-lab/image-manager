@@ -1,0 +1,17 @@
+# Configuration file for training a pretrained (generator) SRGAN model.
+
+experiment_name: 'SRGAN/training_V1'
+model_type: 'SRGAN'
+from_pretrained: 'False' # False: only pretrained generator. True: pretrained generator and discriminator (trained SRGAN).
+task: 'train'  # in ('train', 'test', 'predict')
+
+paths:
+  model_save: '../../../models/super_resolution/'
+  train_set: '../../../data/raw/train'
+  val_set: '../../../data/raw/val'
+  val_images_save: '../../../data/processed/val/'
+
+hyperparameters:
+  batch_size: 4
+  epochs: 52
+  learning_rate: 0.0001

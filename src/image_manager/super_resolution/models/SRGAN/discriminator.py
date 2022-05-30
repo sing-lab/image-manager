@@ -1,6 +1,6 @@
 """Discriminator model."""
 from torch import nn, tensor
-from utils_model import ConvolutionalBlock
+from models.SRGAN.utils_model import ConvolutionalBlock
 
 
 class Discriminator(nn.Module):

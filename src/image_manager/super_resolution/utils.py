@@ -3,7 +3,7 @@ import torch
 import numpy as np
 import random
 import os
-from typing import List, Tuple, Optional
+from typing import Tuple, Optional
 from super_resolution_data import SuperResolutionData
 from torch.utils.data import DataLoader
 from torch import tensor

@@ -4,7 +4,7 @@ import math
 
 from torch import nn, tensor
 
-from utils_model import ConvolutionalBlock, ResidualBlock, SubPixelConvolutionalBlock
+from models.SRGAN.utils_model import ConvolutionalBlock, ResidualBlock, SubPixelConvolutionalBlock
 
 
 class Generator(nn.Module):

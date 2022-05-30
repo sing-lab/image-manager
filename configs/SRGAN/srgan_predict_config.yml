@@ -1,0 +1,13 @@
+# Configuration file for training a pretrained (generator) SRGAN model.
+
+experiment_name: 'SRGAN/predict_V1'
+model_type: 'SRGAN'
+from_pretrained: 'True' # False: only pretrained generator. True: pretrained generator and discriminator (trained SRGAN).
+task: 'predict'  # in ('train', 'test', 'predict')
+reverse_normalize: 'True'
+force_cpu: 'True'
+
+paths:
+  test_set: [ '../../../data/raw/predict' ]
+  test_images_save: [ '../../../data/processed/predict/' ]
+

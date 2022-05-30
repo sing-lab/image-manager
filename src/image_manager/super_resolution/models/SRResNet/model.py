@@ -1,4 +1,4 @@
-"""SRResNet model."""
+"""SrResNet_training_V1 model."""
 import os
 from datetime import datetime
 from time import time
@@ -6,8 +6,8 @@ from typing import Tuple, Union
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILImage, Normalize
 from torch.utils.tensorboard import SummaryWriter
-from src.image_manager.super_resolution.models.super_resolution_model_base import SuperResolutionModelBase
-from src.image_manager.super_resolution.models.SRGAN.generator import Generator
+from models.super_resolution_model_base import SuperResolutionModelBase
+from models.SRGAN.generator import Generator
 
 import numpy as np
 import torch
@@ -15,7 +15,7 @@ from torch.nn import MSELoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image, make_grid
-from src.image_manager.super_resolution.super_resolution_data import SuperResolutionData
+from super_resolution_data import SuperResolutionData
 import shutil
 
 
@@ -229,7 +229,7 @@ class SRResNet(SuperResolutionModelBase):
                 val_losses.append(loss)
 
                 # Save images.
-                if images_save_folder and i_batch % (total_batch // 10) == 0:
+                if images_save_folder and (total_batch <= 10 or i_batch % (total_batch // 10) == 0):
                     for i in range(sr_images.size(0)):
 
                         if reverse_normalize:
@@ -270,7 +270,8 @@ class SRResNet(SuperResolutionModelBase):
 
         return sum(val_losses) / len(val_losses), sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
 
-    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, images_save_folder: str = "") -> None:
+    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, images_save_folder: str = "",
+                force_cpu: bool = True) -> None:
         """
         Process an image into super resolution.
         We use high resolution images as input, therefore test_dataset should have parameter normalize_hr set to True.
@@ -283,6 +284,8 @@ class SRResNet(SuperResolutionModelBase):
             The batch size for predictions.
         images_save_folder: str
             The folder where to save predicted images.
+        force_cpu: bool
+            Whether to force usage of CPU or not (inference on high resolution images may run GPU out of memory).
 
         """
         if images_save_folder:
@@ -296,12 +299,13 @@ class SRResNet(SuperResolutionModelBase):
             print("Warning! As we use high resolution images as model input, test_dataset should have 'normalize_hr' "
                   "set to True (currently False).")
 
-        # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        device = torch.device('cpu')  # TODO remove
+        device = torch.device('cuda') if torch.cuda.is_available() and not force_cpu else torch.device('cpu')
         self.generator.to(device)
         self.generator.eval()
 
-        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4,
+                                 persistent_workers=True)
+
         total_batch = len(data_loader)
 
         start = time()

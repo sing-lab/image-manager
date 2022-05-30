@@ -80,7 +80,7 @@ class BicubicInterpolation:
                 sr_images = Resize((high_res_height, high_res_width), interpolation=InterpolationMode.BICUBIC)(lr_images)
 
                 # Save images.
-                if images_save_folder and i_batch % (total_batch // 10) == 0:
+                if images_save_folder and (total_batch <= 10 or i_batch % (total_batch // 10) == 0):
                     for i in range(sr_images.size(0)):
                         images = torch.stack([transform(lr_images[i, :, :, :]),
                                               transform(sr_images[i, :, :, :]),
