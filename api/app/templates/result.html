@@ -25,13 +25,17 @@
 
   <div class="row">
   <div class="column">
-    <img src="{{ lr_image_path }}" alt="Original" style="width:100%">
+    <img class=img src="{{ lr_image_path }}" alt="Original">
       <h1 class="h3 mb-3 font-weight-normal">Original</h1>
   </div>
   <div class="column">
-    <img src="{{ sr_image_path }}" alt="Super resolution" style="width:100%">
+    <img class=img src="{{ sr_image_path }}" alt="Super resolution">
       <h1 class="h3 mb-3 font-weight-normal">Super Resolution</h1>
   </div>
+
+  <div style="border: 1px solid">
+    <a class="btn btn-success" type="submit" href="{{ url_for('download_image', filepath=sr_image_path) }}" style="display: block; margin: 0 auto;">Download</a>
+</div>
 
 
 <!--    <form class="form-signin" method=post enctype=multipart/form-data>-->

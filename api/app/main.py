@@ -6,7 +6,7 @@ import sys
 from urllib import request
 
 from PIL import Image
-from flask import Flask
+from flask import Flask, send_file
 from flask import request, render_template
 from werkzeug.utils import redirect
 
@@ -42,6 +42,18 @@ def predict():
     sr_image_path = get_prediction(lr_image_path)
 
     return render_template('result.html', sr_image_path=sr_image_path, lr_image_path=lr_image_path)
+
+
+@app.route('/download/<filepath>', methods=['GET'])
+def download_image(filepath):
+    """
+    Download a super resolution image.
+    """
+    sr_image_path = request.view_args['filepath']
+    return send_file(sr_image_path,
+                     mimetype='image/png',
+                     attachment_filename=os.path.basename(sr_image_path),
+                     as_attachment=True)
 
 
 if __name__ == '__main__':

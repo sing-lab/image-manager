@@ -40,6 +40,11 @@ body {
 /* Create three equal columns that sits next to each other */
 .column {
   flex: 50%;
-  padding: 5px;
+  padding: 10px;
 }
 
+.img {
+    width:  500px;
+    height: 500px;
+    background-size: cover;
+}
