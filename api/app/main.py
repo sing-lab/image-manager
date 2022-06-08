@@ -3,6 +3,7 @@
 import io
 import os
 import sys
+from time import time
 from urllib import request
 
 from PIL import Image
@@ -38,7 +39,9 @@ def predict():
     image = Image.open(io.BytesIO(image_bytes))
     lr_image_path = os.path.join("static", "images", file.filename)
     image.save(lr_image_path)
+    start = time()
     sr_image_path = get_prediction(lr_image_path)
+    print(f"Prediction run in {time() - start:.2f} s.", flush=True)
 
     return render_template('result.html', sr_image_path=sr_image_path, lr_image_path=lr_image_path)
 
