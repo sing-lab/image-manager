@@ -11,7 +11,6 @@ from flask import request, render_template
 from werkzeug.utils import redirect
 
 sys.path.append("C:\\Users\\Mathias\\Documents\\Projets_Python\\image_manager\\src\\image_manager\\super_resolution")
-sys.path.append("..\\.\\")
 
 from super_resolution import get_prediction
 
@@ -23,7 +22,7 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/predict', methods=['POST'])  #TODO make a separate predict route
+@app.route('/predict', methods=['POST'])
 def predict():
     """
     Make prediction for a file.

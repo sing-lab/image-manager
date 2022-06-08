@@ -38,7 +38,8 @@ def get_model_from_enum(model: ModelEnum, from_pretrained: bool = False) -> Supe
         model from enum
     """
     if model.name.lower() == 'srgan':
-        base_model = SRGAN(discriminator=Discriminator(), generator=Generator(), truncated_vgg=TruncatedVGG())
+        # base_model = SRGAN(discriminator=Discriminator(), generator=Generator(), truncated_vgg=TruncatedVGG())
+        base_model = SRGAN(discriminator=Discriminator(), generator=Generator(), truncated_vgg=None)  #TODO For testing
         if from_pretrained:
             try:
                 base_model.load(generator="../../../models/super_resolution/SRGAN/Article/generator.torch",

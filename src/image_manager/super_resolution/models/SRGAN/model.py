@@ -354,8 +354,8 @@ class SRGAN(SuperResolutionModelBase):
         self.generator.to(device)
         self.generator.eval()
 
-        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4,
-                                 persistent_workers=True)
+        # pin_memory can lead to too much pagination memory needed.
+        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
         total_batch = len(data_loader)
 
         start = time()

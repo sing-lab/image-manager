@@ -18,6 +18,13 @@ Changelog = "https://github.com/sing-lab/image_manager/releases"
 [tool.poetry.dependencies]
 python = "^3.7"
 click = "^8.0.1"
+Pillow = "^9.1.1"
+Flask = "^2.1.2"
+scikit-image = "^0.19.2"
+tensorboard = "^2.9.0"
+poethepoet = "^0.13.1"
+setuptools = "59.5.0"
+protobuf = "^3.20.0"  # Avoid conflict with tensorboard.
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"
@@ -43,6 +50,10 @@ sphinx-click = "^3.0.2"
 Pygments = "^2.10.0"
 pyupgrade = "^2.29.1"
 furo = ">=2021.11.12"
+
+[tool.poe.tasks]
+#force-cuda11 = "python -m pip install torch==1.10.2+cu113 torchvision==0.11.3+cu113 -f https://download.pytorch.org/whl/torch_stable.html"
+force-cuda11 = "python -m pip install torchvision==0.11.0+cu113 -f https://download.pytorch.org/whl/torch_stable.html"
 
 [tool.poetry.scripts]
 image_manager = "image_manager.__main__:main"

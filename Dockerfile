@@ -1,17 +1,33 @@
-FROM python:3.10.4-slim
+# Stage 1: Builder/Compiler
+FROM pytorch/pytorch:1.10.0-cuda11.3-cudnn8-runtime
 
 WORKDIR /app
 
-COPY ./src /tmp/src
+# Copy requirements
+COPY pyproject.toml /app
 
 # Set environment variables
+ENV PYTHONPATH "${PYTHONPATH}:/src"
+# Python output is sent straight to terminal without being first buffered
 ENV PYTHONUNBUFFERED 1
 
-EXPOSE 5000
+RUN pip install poetry==1.1.13
+RUN poetry config virtualenvs.create false  # No need to create a virtual env (already inside a docker image)
+RUN poetry install --no-root --no-dev  # No dev packages and project's package
+RUN pip install torchvision==0.11.0+cu113 -f https://download.pytorch.org/whl/torch_stable.html --no-deps  # Compatible with torch based image and cuda
 
 # Install project
-COPY ./README.md /tmp/README.md
-COPY ./src /tmp/src
+COPY src/image_manager/super_resolution /src
 
-# Copy project
-COPY api /app
+# Copy trained models
+COPY models /models
+
+# Copy demo
+COPY api/app /app
+
+#EXPORT
+
+
+#TODO add models
+#CMD ["gunicorn", "--bind", "0.0.0.0:5000", "server:app"]
+#ENTRYPOINT ["gunicorn", "-b", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--timeout", "120"]

@@ -21,8 +21,12 @@ def get_prediction(image_path):
         dataset = SuperResolutionData(image_folder=dataset_folder, is_train_split=False, scaling_factor=4,
                                       normalize_hr=True)
 
-        model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
-                      force_cpu=True)
+        try:
+            model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
+                          force_cpu=False)
+        except RuntimeError:  # CUDA out of memory: try to predict using CPU only.
+            model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
+                          force_cpu=True)
 
         # Save image for user display.
         sr_image_path = os.path.join("static", "images", f"sr_{image_name}")
