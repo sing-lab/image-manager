@@ -25,6 +25,9 @@ COPY models /models
 # Copy demo
 COPY api/app /app
 
+# Since Flask apps listen to port 5000  by default, we expose it
+EXPOSE 5000
+
 #TODO add models
 #CMD ["gunicorn", "--bind", "0.0.0.0:5000", "server:app"]
 #ENTRYPOINT ["gunicorn", "-b", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--timeout", "120"]

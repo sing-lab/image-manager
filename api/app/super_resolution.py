@@ -22,9 +22,11 @@ def get_prediction(image_path):
                                       normalize_hr=True)
 
         try:
+            print("Try to use GPU", flush=True)
             model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
                           force_cpu=False)
         except RuntimeError:  # CUDA out of memory: try to predict using CPU only.
+            print("Not enough GPU memory: will run on CPU", flush=True)
             model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
                           force_cpu=True)
 
