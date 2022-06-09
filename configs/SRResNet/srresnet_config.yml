@@ -1,0 +1,24 @@
+# Configuration file for training a pretrained (generator) SRGAN model.  #TODO
+
+experiment_name: 'SRRESNET_training_V1'  # A specific folder for all saved data / model will be auto created with this name.
+model_type: 'SRRESNET'
+from_pretrained: 'True' # Use the pretrained model.
+task: 'train'  # in ('train', 'evaluate', 'predict')
+
+paths:
+  #TODO add all training parameters to use **config["train_parameters"]. Put full paths.
+
+  # Paths
+  model_save_folder: '../../../models/super_resolution/'
+
+  train_images_input_path: '../../../data/raw/train'
+  val_images_input_path: '../../../data/raw/val'
+  test_images_input_path: '../../../data/raw/test'
+
+  val_images_save_folder: '../../../data/processed/val/'
+  test_images_save_folder: '../../../data/processed/test/'
+
+hyperparameters:
+  batch_size: 4
+  epochs: 52  #TODO
+  learning_rate: 0.0001

@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+#    command: uvicorn app.main:app --reload --workers 1 --host 0.0.0.0 --port 8080
+    command: python main.py
+    volumes:
+      - ../api/app/static/images:/app/data_container
+    ports:
+      - "5000:5000"  # mapping of <Host>:<Container> ports.
+    ipc: host  # Increase the shared memory size for the container
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+  test:
+    image: nvidia/cuda:11.3.0-base
+    command: nvidia-smi
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
