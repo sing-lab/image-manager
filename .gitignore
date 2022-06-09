@@ -10,9 +10,6 @@
 __pycache__/
 /data/
 /api/app/.idea/
-.idea/*
-/.idea/*
-/**/.idea/*
 /.idea
 /api/app/static/images
-/models
+/models/*
