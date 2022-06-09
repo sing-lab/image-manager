@@ -7,27 +7,25 @@ services:
       dockerfile: Dockerfile
 #    command: uvicorn app.main:app --reload --workers 1 --host 0.0.0.0 --port 8080
     command: python main.py
-#    command: python -c "import os;print(os.listdir('models'));"
     volumes:
       - ../api/app/static/images:/app/data_container
     ports:
       - "5000:5000"  # mapping of <Host>:<Container> ports.
+    ipc: host  # Increase the shared memory size for the container
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
   test:
-#    image: nvidia/cuda:11.3.0-cudnn8-devel
     image: nvidia/cuda:11.3.0-base
-#    command: python -c "import torch;print(torch.cuda.is_available());print(torch.cuda.get_device_name(0));"
     command: nvidia-smi
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
