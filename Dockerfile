@@ -1,33 +1,75 @@
-# Stage 1: Builder/Compiler
-FROM pytorch/pytorch:1.10.0-cuda11.3-cudnn8-runtime
+# Stage 1: `python-base` sets up all our shared environment variables.
+FROM python:3.9-slim as python-base
 
-WORKDIR /app
+ENV PYTHONUNBUFFERED=1 \
+    # prevents python creating .pyc files
+    PYTHONDONTWRITEBYTECODE=1 \
+    \
+    # PIP
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100 \
+    \
+    # POETRY
+    # https://python-poetry.org/docs/configuration/#using-environment-variables
+    POETRY_VERSION=1.1.13 \
+    # Install poetry to this location
+    POETRY_HOME="/opt/poetry" \
+    # make poetry create the virtual environment in the project's root
+    # it gets named `.venv`
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    # do not ask any interactive question
+    POETRY_NO_INTERACTION=1 \
+    # poetry virtual env location
+    VENV_PATH="/.venv"
+
+# Add POETRY_HOME to path, and VENV_PATH (poetry virtual env location) to path
+ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
+
+
+# Stage 2: `builder-base` stage is used to build deps + create our virtual environment. Cuda already installed on pytorch wheel
+FROM python-base as builder-base
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        # deps for installing poetry
+        curl \
+        # deps for building python deps
+        build-essential
+
+# install poetry - respects $POETRY_VERSION & $POETRY_HOME
+RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python3
 
 # Copy requirements
-COPY pyproject.toml /app
+COPY poetry.lock pyproject.toml ./
 
-# Set environment variables
-ENV PYTHONPATH "${PYTHONPATH}:/src"
-# Python output is sent straight to terminal without being first buffered
-ENV PYTHONUNBUFFERED 1
+# Marked as unsafe on poetry < 1.20: cannnot be added directly into pyproject.toml. Needed for pytorch (bug with last v)
+RUN poetry run pip install 'setuptools==59.5.0'
 
-RUN pip install poetry==1.1.13
-RUN poetry config virtualenvs.create false  # No need to create a virtual env (already inside a docker image)
 RUN poetry install --no-root --no-dev  # No dev packages and project's package
-RUN pip install torchvision==0.11.0+cu113 -f https://download.pytorch.org/whl/torch_stable.html --no-deps  # Compatible with torch based image and cuda
+
+# Install torch (use poetry cause conflicts)
+RUN poe force-cuda11
+
+
+# Stage 3: `production` image used for runtime
+FROM python-base as production
+
+COPY --from=builder-base $VENV_PATH $VENV_PATH
 
 # Install project
-COPY src/image_manager/super_resolution /src
+COPY src/image_manager/super_resolution /super_resolution
 
-# Copy trained models
+## Copy trained models
 COPY models /models
 
 # Copy demo
 COPY api/app /app
 
+# Add project root to path (not to $PATH !)
+ENV PYTHONPATH="${PYTHONPATH}:/super_resolution"
+
+WORKDIR /app
+
 # Since Flask apps listen to port 5000  by default, we expose it
 EXPOSE 5000
-
-#TODO add models
-#CMD ["gunicorn", "--bind", "0.0.0.0:5000", "server:app"]
-#ENTRYPOINT ["gunicorn", "-b", "0.0.0.0:8000", "--access-logfile", "-", "--error-logfile", "-", "--timeout", "120"]

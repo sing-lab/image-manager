@@ -12,7 +12,6 @@ from flask import request, render_template
 from werkzeug.utils import redirect
 
 sys.path.append("C:\\Users\\Mathias\\Documents\\Projets_Python\\image_manager\\src\\image_manager\\super_resolution")
-
 from super_resolution import get_prediction
 
 app = Flask(__name__)
