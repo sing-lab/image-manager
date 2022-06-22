@@ -9,3 +9,7 @@
 /src/*.egg-info/
 __pycache__/
 /data/
+/api/app/.idea/
+/.idea
+/api/app/static/images
+/models/*

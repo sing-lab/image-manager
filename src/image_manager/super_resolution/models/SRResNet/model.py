@@ -4,8 +4,8 @@ from datetime import datetime
 from time import time
 from typing import Tuple, Union
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
-from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILImage, Normalize
 from torch.utils.tensorboard import SummaryWriter
+from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILImage, Normalize
 from models.super_resolution_model_base import SuperResolutionModelBase
 from models.SRGAN.generator import Generator
 
@@ -303,8 +303,8 @@ class SRResNet(SuperResolutionModelBase):
         self.generator.to(device)
         self.generator.eval()
 
-        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4,
-                                 persistent_workers=True)
+        # pin_memory can lead to too much pagination memory needed.
+        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
         total_batch = len(data_loader)
 
