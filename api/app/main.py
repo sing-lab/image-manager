@@ -42,18 +42,20 @@ def predict():
     sr_image_path = get_prediction(lr_image_path)
     print(f"Prediction run in {time() - start:.2f} s.", flush=True)
 
-    return render_template('result.html', sr_image_path=sr_image_path, lr_image_path=lr_image_path)
+    return render_template('result.html', sr_image_path=sr_image_path, lr_image_path=lr_image_path,
+                           sr_image_name=os.path.basename(sr_image_path))
 
 
-@app.route('/download/<filepath>', methods=['GET'])
-def download_image(filepath):
+@app.route('/download/<filename>', methods=['GET'])
+def download_image(filename):
     """
-    Download a super resolution image.
+    Download a super resolution image.  #TODO: not working (url not found on docker) if we use filepath instead of filename
     """
-    sr_image_path = request.view_args['filepath']
-    return send_file(sr_image_path,
+    filename = request.view_args['filename']
+
+    return send_file(os.path.join(app.root_path, "static", "images", filename),
                      mimetype='image/png',
-                     attachment_filename=os.path.basename(sr_image_path),
+                     attachment_filename=filename,
                      as_attachment=True)
 
 

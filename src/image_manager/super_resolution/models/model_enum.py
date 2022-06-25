@@ -20,7 +20,7 @@ class ModelEnum(Enum):
 
 def get_model_from_enum(model: ModelEnum, from_pretrained: bool = False) -> SuperResolutionModelBase:
     """
-    Get specific model from enum.  #TODO change path for app.
+    Get specific model from enum.
 
     SRGAN: never trained from scratched.
         - Loaded by default with pretrained generator.
@@ -42,27 +42,26 @@ def get_model_from_enum(model: ModelEnum, from_pretrained: bool = False) -> Supe
         base_model = SRGAN(discriminator=Discriminator(), generator=Generator(), truncated_vgg=None)  #TODO For testing
         if from_pretrained:
             try:
-                base_model.load(generator="../../../models/super_resolution/SRGAN/Article/generator.torch",
-                                discriminator="../../../models/super_resolution/SRGAN/Article/discriminator.torch")
-            except FileNotFoundError:
                 base_model.load(generator="../../models/super_resolution/SRGAN/Article/generator.torch",
                                 discriminator="../../models/super_resolution/SRGAN/Article/discriminator.torch")
+            except FileNotFoundError:  # On docker image
+                base_model.load(generator="/models/super_resolution/SRGAN/Article/generator.torch",
+                                discriminator="/models/super_resolution/SRGAN/Article/discriminator.torch")
         else:
             try:
                 base_model.load(
-                    generator="../../../models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch")
-            except FileNotFoundError:
-                base_model.load(
                     generator="../../models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch")
+            except FileNotFoundError:  # On docker image
+                base_model.load(generator="/models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch")
         return base_model
 
     if model.name.lower() == 'srresnet':
         base_model = SRResNet()
         if from_pretrained:
             try:
-                base_model.load('../../../models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch')
-            except FileNotFoundError:
                 base_model.load('../../models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch')
+            except FileNotFoundError:  # On docker image
+                base_model.load('/models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch')
 
         return base_model
 
