@@ -13,3 +13,4 @@ __pycache__/
 /.idea
 /api/app/static/images
 /models/*
+/models
