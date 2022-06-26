@@ -1,6 +1,4 @@
 [core]
-    remote = gdrive-image-manager
-['remote "gdrive-image-manager"']
+    remote = gdrive-auth
+['remote "gdrive-auth"']
     url = gdrive://1I0HLKzoFyZtcWoSZYtMLuHX684APyA5M
-    gdrive_use_service_account = true
-    gdrive_service_account_json_file_path = ../conf/picture-manager-321517-4b57c24128c0.json
