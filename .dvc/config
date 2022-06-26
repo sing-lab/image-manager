@@ -2,3 +2,4 @@
     remote = gdrive-image-manager
 ['remote "gdrive-image-manager"']
     url = gdrive://1I0HLKzoFyZtcWoSZYtMLuHX684APyA5M
+    gdrive_use_service_account = true
