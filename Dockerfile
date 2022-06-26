@@ -60,8 +60,12 @@ COPY --from=builder-base $VENV_PATH $VENV_PATH
 # Install project
 COPY src/image_manager/super_resolution /super_resolution
 
-## Copy trained models
-COPY models /models
+# Pull trained models from google drive with DVC. You should have a conf file with credentials in conf/
+COPY conf /conf
+COPY models.dvc ./
+COPY .dvc/config /.dvc/config
+RUN dvc config core.no_scm true  # Tells DVC to no look for a git repo.
+RUN dvc pull models
 
 # Copy demo
 COPY api/app /app

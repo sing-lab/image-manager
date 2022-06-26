@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     command: python main.py
-    volumes:
+    volumes:  #TODO remove volume
       - ../api/app/static/images:/app/data_container
     ports:
       - "5000:5000"  # mapping of <Host>:<Container> ports.
