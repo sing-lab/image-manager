@@ -5,8 +5,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: python main.py
-    volumes:
+    command: >  # Download models with authentification, and run main script
+      sh -c "dvc pull models &&
+             cd app &&
+             python main.py"
+    volumes:  #TODO remove volume
       - ../api/app/static/images:/app/data_container
     ports:
       - "5000:5000"  # mapping of <Host>:<Container> ports.

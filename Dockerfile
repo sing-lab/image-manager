@@ -60,16 +60,16 @@ COPY --from=builder-base $VENV_PATH $VENV_PATH
 # Install project
 COPY src/image_manager/super_resolution /super_resolution
 
-## Copy trained models
-COPY models /models
+# Set up DVC to download models
+COPY .dvc/config /.dvc/config
+COPY models.dvc ./
+RUN dvc config core.no_scm true  # Tells DVC to no look for a git repo.
 
 # Copy demo
 COPY api/app /app
 
 # Add project root to path (not to $PATH !)
 ENV PYTHONPATH="${PYTHONPATH}:/super_resolution"
-
-WORKDIR /app
 
 # Since Flask apps listen to port 5000  by default, we expose it
 EXPOSE 5000
