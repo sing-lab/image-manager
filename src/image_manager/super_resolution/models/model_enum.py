@@ -1,4 +1,6 @@
 """List of trained models."""
+import os
+
 from enum import Enum
 from models.SRResNet.model import SRResNet
 
@@ -38,30 +40,31 @@ def get_model_from_enum(model: ModelEnum, from_pretrained: bool = False) -> Supe
         model from enum
     """
     if model.name.lower() == 'srgan':
-        # base_model = SRGAN(discriminator=Discriminator(), generator=Generator(), truncated_vgg=TruncatedVGG())
-        base_model = SRGAN(discriminator=Discriminator(), generator=Generator(), truncated_vgg=None)  #TODO For testing
+        base_model = SRGAN(discriminator=Discriminator(), generator=Generator(), truncated_vgg=TruncatedVGG())
         if from_pretrained:
-            try:
-                base_model.load(generator="../../models/super_resolution/SRGAN/Article/generator.torch",
-                                discriminator="../../models/super_resolution/SRGAN/Article/discriminator.torch")
-            except FileNotFoundError:  # On docker image
-                base_model.load(generator="/models/super_resolution/SRGAN/Article/generator.torch",
-                                discriminator="/models/super_resolution/SRGAN/Article/discriminator.torch")
+            for path in ["/", "../../", "../../../"]:  # docker image: '/' - app: '../..' - main: '../../../'
+                try:
+                    base_model.load(generator=os.path.join(path, "models/super_resolution/SRGAN/Article/generator.torch"),
+                                    discriminator=os.path.join(path, "models/super_resolution/SRGAN/Article/discriminator.torch"))
+                except FileNotFoundError:  # On docker image
+                    continue
+
         else:
-            try:
-                base_model.load(
-                    generator="../../models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch")
-            except FileNotFoundError:  # On docker image
-                base_model.load(generator="/models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch")
+            for path in ["/", "../../", "../../../"]:  # docker image: '/' - app: '../..' - main: '../../../'
+                try:
+                    base_model.load(generator=os.path.join(path, "models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch"),
+                                    discriminator=os.path.join(path, "models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch"))
+                except FileNotFoundError:  # On docker image
+                    continue
         return base_model
 
     if model.name.lower() == 'srresnet':
         base_model = SRResNet()
-        if from_pretrained:
+        for path in ["/", "../../", "../../../"]:  # docker image: '/' - app: '../..' - main: '../../../'
             try:
-                base_model.load('../../models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch')
+                base_model.load(generator=os.path.join(path, "models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch"))
             except FileNotFoundError:  # On docker image
-                base_model.load('/models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch')
+                continue
 
         return base_model
 

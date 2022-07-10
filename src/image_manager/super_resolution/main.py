@@ -1,9 +1,4 @@
 """Main module to train / test a model or make predictions."""
-import sys
-
-# Add thr project root in path to be able to use absolute import from this root on other submoduels.
-# For docker image use "Export"
-sys.path.append("C:\\Users\\Mathias\\Documents\\Projets_Python\\image_manager\\src\\image_manager\\super_resolution")
 import os
 from time import time
 
