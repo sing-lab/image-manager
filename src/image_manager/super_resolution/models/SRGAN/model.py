@@ -3,9 +3,10 @@ import os
 import shutil
 from time import time
 from typing import Tuple, Optional, Union
+from math import ceil
 
-import torch
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+import torch
 from torch.nn import MSELoss, BCEWithLogitsLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import MultiStepLR
@@ -195,7 +196,7 @@ class SRGAN(SuperResolutionModelBase):
             # Evaluation step.
             psnr, ssim = self.evaluate(val_dataset,
                                        batch_size=1,
-                                       images_save_folder="{images_save_folder}_epoch_{str(epoch + 1)}")
+                                       images_save_folder=f"{images_save_folder}_epoch_{str(epoch + 1)}")
 
             writer.add_scalar("Val/PSNR", psnr, epoch + 1)
             writer.add_scalar("Val/SSIM", ssim, epoch + 1)
@@ -322,7 +323,9 @@ class SRGAN(SuperResolutionModelBase):
         return sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
 
     def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, images_save_folder: str = "",
-                force_cpu: bool = True) -> None:
+                force_cpu: bool = True, tile_size: int = 96, tile_overlap: Optional[int] = 10, scaling_factor: int = 4) \
+            -> None:  # TODO set default val
+        # TODO gerer qd batch_size != 1
         """
         Process an image into super resolution.
         We use high resolution images as input, therefore test_dataset should have parameter normalize_hr set to True.
@@ -337,7 +340,14 @@ class SRGAN(SuperResolutionModelBase):
             The folder where to save predicted images.
         force_cpu: bool
             Whether to force usage of CPU or not (inference on high resolution images may run GPU out of memory).
-
+        tile_size: int, default 0
+            As too large images result in the out of GPU memory issue, tile option will first crop input images into
+            tiles, then process each of them. Finally, they will be merged into one image. 0: not used tiles.
+            It is advised to use the same tile_size as low resolution image in the training.
+        tile_overlap: Optional[int], default None
+            Overlap pixels between tiles.
+        scaling_factor: int, default 4
+            The scaling factor to use when downscaling high resolution images into low resolution images.
         """
         if images_save_folder:
             if os.path.exists(images_save_folder):
@@ -361,9 +371,68 @@ class SRGAN(SuperResolutionModelBase):
         start = time()
 
         with torch.no_grad():
-            for i_batch, (lr_images, hr_images) in enumerate(data_loader):
-                hr_images = hr_images.to(device)
-                sr_images = self.generator(hr_images)
+            for i_batch, (_, hr_images) in enumerate(data_loader):
+
+                if tile_size:
+                    batch, channel, height, width = hr_images.shape
+                    output_height = height * scaling_factor
+                    output_width = width * scaling_factor
+                    output_shape = (batch, channel, output_height, output_width)
+
+                    # Start with a black image (on CPU as GPU is not needed)
+                    sr_images = hr_images.new_zeros(output_shape)
+                    tiles_x = ceil(width / tile_size)
+                    tiles_y = ceil(height / tile_size)
+
+                    # loop over all tiles
+                    for index_y in range(tiles_y):  # TODO GPU all in one batch. Add padding .
+                        for index_x in range(tiles_x):
+                            # Extract tile from input image
+                            offset_x = index_x * tile_size
+                            offset_y = index_y * tile_size
+
+                            # Input tile area on total image
+                            input_start_x = offset_x
+                            input_end_x = min(offset_x + tile_size, width)
+                            input_start_y = offset_y
+                            input_end_y = min(offset_y + tile_size, height)
+
+                            # Input tile area on total image with overlapping.
+                            input_start_x_overlap = max(input_start_x - tile_overlap, 0)
+                            input_end_x_overlap = min(input_end_x + tile_overlap, width)
+                            input_start_y_overlap = max(input_start_y - tile_overlap, 0)
+                            input_end_y_overlap = min(input_end_y + tile_overlap, height)
+
+                            # Input tile dimensions
+                            input_tile_width = input_end_x - input_start_x
+                            input_tile_height = input_end_y - input_start_y
+                            tile_index = index_y * tiles_x + index_x + 1
+                            input_tile = hr_images[:, :, input_start_y_overlap:input_end_y_overlap,
+                                         input_start_x_overlap:input_end_x_overlap].to(device)
+
+                            # Upscale overlapped tile
+                            output_tile = self.generator(input_tile)
+
+                            print(f'\tTile {tile_index}/{tiles_x * tiles_y}')
+
+                            # Get upscaled tile from upscaled overlapped tile
+                            output_start_x = input_start_x * scaling_factor
+                            output_end_x = input_end_x * scaling_factor
+                            output_start_y = input_start_y * scaling_factor
+                            output_end_y = input_end_y * scaling_factor
+
+                            # output tile area without padding
+                            output_start_x_tile = (input_start_x - input_start_x_overlap) * scaling_factor
+                            output_end_x_tile = output_start_x_tile + input_tile_width * scaling_factor
+                            output_start_y_tile = (input_start_y - input_start_y_overlap) * scaling_factor
+                            output_end_y_tile = output_start_y_tile + input_tile_height * scaling_factor
+
+                            # Add upscaled tile into output image
+                            sr_images[:, :, output_start_y:output_end_y, output_start_x:output_end_x] = \
+                                output_tile[:, :, output_start_y_tile:output_end_y_tile, output_start_x_tile: output_end_x_tile]
+
+                else:
+                    sr_images = self.generator(hr_images.to(device))
 
                 # Save images
                 if images_save_folder:

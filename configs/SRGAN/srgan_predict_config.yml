@@ -2,10 +2,10 @@
 
 experiment_name: 'SRGAN/predict_V1'
 model_type: 'SRGAN'
-from_pretrained: 'True' # False: only pretrained generator. True: pretrained generator and discriminator (trained SRGAN).
+from_pretrained: True # False: only pretrained generator. True: pretrained generator and discriminator (trained SRGAN).
 task: 'predict'  # in ('train', 'test', 'predict')
-reverse_normalize: 'True'
-force_cpu: 'True'
+reverse_normalize: True
+force_cpu: False
 
 paths:
   test_set: [ '../../../data/raw/predict' ]
