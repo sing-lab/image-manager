@@ -11,12 +11,14 @@ import torch.backends.cudnn as cudnn
 
 cudnn.benchmark = True  # Better performances.
 
+# Split path to let python chose correct separator
 
 if __name__ == "__main__":
     start = time()
 
     # Loading config.
-    config_path = "../../../configs/SRGAN/srgan_predict_config.yml"  # TODO use arg() or parameter
+    # config_path = "../../../configs/SRGAN/srgan_predict_config.yml"  # TODO use arg() or parameter
+    config_path = "../../../configs/SRGAN/srgan_train_config.yml"  # TODO use arg() or parameter
     config = load_config(config_path)
 
     # Loading model.
@@ -25,19 +27,21 @@ if __name__ == "__main__":
 
     # Running task.
     if config["task"] == "train":
-        train_dataset = SuperResolutionData(image_folder=config["paths"]["train_set"],
+        train_dataset = SuperResolutionData(image_folder=os.path.join(*config["paths"]["train_set"].split('/')),
                                             is_train_split=True,
                                             normalize_lr=True)
 
-        val_dataset = SuperResolutionData(image_folder=config["paths"]["val_set"],
+        val_dataset = SuperResolutionData(image_folder=os.path.join(*config["paths"]["val_set"].split('/')),
                                           is_train_split=False,
                                           normalize_lr=True)
 
         # One config file by model type.
         model.train(train_dataset=train_dataset,
                     val_dataset=val_dataset,
-                    model_save_folder=os.path.join(config["paths"]['model_save'], config['experiment_name']),
-                    images_save_folder=os.path.join(config["paths"]["val_images_save"], config["experiment_name"]),
+                    model_save_folder=os.path.join(*config["paths"]['model_save'].split('/'),
+                                                   *config['experiment_name'].split('/')),
+                    images_save_folder=os.path.join(*config["paths"]["val_images_save"].split('/'),
+                                                    *config["experiment_name"].split('/')),
                     experiment_name=config["experiment_name"],
                     **config["hyperparameters"]
                     )
@@ -54,7 +58,8 @@ if __name__ == "__main__":
 
             psnr, ssim = model.evaluate(val_dataset=test_dataset,
                                         batch_size=1,
-                                        images_save_folder=os.path.join(images_save_folder, config["experiment_name"]),
+                                        images_save_folder=os.path.join(*images_save_folder.split('/'),
+                                                                        *config["experiment_name"].split('/')),
                                         reverse_normalize=config["reverse_normalize"]
                                         )
             print(f"{os.path.basename(image_folder)} - PSNR: {psnr}, SSIM: {ssim}")
@@ -72,7 +77,8 @@ if __name__ == "__main__":
             model.predict(test_dataset=test_dataset,
                           batch_size=1,
                           force_cpu=config["force_cpu"],
-                          images_save_folder=os.path.join(images_save_folder, config["experiment_name"])
+                          images_save_folder=os.path.join(*images_save_folder.split('/'),
+                                                          *config["experiment_name"].split('/'))
                           )
 
     print(f"{config['task']} completed in {time() - start:.2f} seconds.")
