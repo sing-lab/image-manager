@@ -17,8 +17,7 @@ if __name__ == "__main__":
     start = time()
 
     # Loading config.
-    # config_path = "../../../configs/SRGAN/srgan_predict_config.yml"  # TODO use arg() or parameter
-    config_path = "../../../configs/SRGAN/srgan_train_config.yml"  # TODO use arg() or parameter
+    config_path = "../../../configs/SRGAN/srgan_predict_config.yml"  # TODO use arg() or parameter
     config = load_config(config_path)
 
     # Loading model.
@@ -75,7 +74,7 @@ if __name__ == "__main__":
                                                normalize_hr=True)
 
             model.predict(test_dataset=test_dataset,
-                          batch_size=1,
+                          tile_batch_size=config["tile_batch_size"],
                           force_cpu=config["force_cpu"],
                           images_save_folder=os.path.join(*images_save_folder.split('/'),
                                                           *config["experiment_name"].split('/'))

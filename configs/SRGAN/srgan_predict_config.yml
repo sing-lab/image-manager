@@ -6,6 +6,7 @@ from_pretrained: True # False: only pretrained generator. True: pretrained gener
 task: 'predict'  # in ('train', 'test', 'predict')
 reverse_normalize: True
 force_cpu: False
+tile_batch_size: 8
 
 paths:
   test_set: [ '../../../data/raw/predict' ]

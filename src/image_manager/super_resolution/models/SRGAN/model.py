@@ -18,9 +18,10 @@ from torchvision.utils import save_image, make_grid
 
 from models.SRGAN.discriminator import Discriminator
 from models.SRGAN.generator import Generator
-from super_resolution_data import SuperResolutionData
-from models.super_resolution_model_base import SuperResolutionModelBase
 from models.SRGAN.utils_loss import TruncatedVGG
+from models.super_resolution_model_base import SuperResolutionModelBase
+from models.utils_models import get_tiles_from_image, get_image_from_tiles
+from super_resolution_data import SuperResolutionData
 
 
 class SRGAN(SuperResolutionModelBase):
@@ -322,10 +323,12 @@ class SRGAN(SuperResolutionModelBase):
 
         return sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
 
-    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, images_save_folder: str = "",
-                force_cpu: bool = True, tile_size: int = 96, tile_overlap: Optional[int] = 10, scaling_factor: int = 4) \
-            -> None:  # TODO set default val
-        # TODO gerer qd batch_size != 1
+    def predict(self, test_dataset: SuperResolutionData, images_save_folder: str = "", batch_size: int = 1,
+                force_cpu: bool = True, tile_size: int = 96, tile_overlap: Optional[int] = 10,
+                tile_batch_size: Optional[int] = 1,
+                scaling_factor: int = 4,
+                ) \
+            -> None:
         """
         Process an image into super resolution.
         We use high resolution images as input, therefore test_dataset should have parameter normalize_hr set to True.
@@ -335,7 +338,9 @@ class SRGAN(SuperResolutionModelBase):
         test_dataset: SuperResolutionData
             The images to process.
         batch_size: int, default 1
-            The batch size for predictions.
+            The batch size for predictions. If prediction made by tiles, batch_size should be 1.
+        tile_batch_size: int, default 1
+            Images are processed one by one, however tiles for a given image can be processed by batches.
         images_save_folder: str
             The folder where to save predicted images.
         force_cpu: bool
@@ -344,10 +349,16 @@ class SRGAN(SuperResolutionModelBase):
             As too large images result in the out of GPU memory issue, tile option will first crop input images into
             tiles, then process each of them. Finally, they will be merged into one image. 0: not used tiles.
             It is advised to use the same tile_size as low resolution image in the training.
+            Adapted from https://github.com/ata4/esrgan-launcher/blob/master/upscale.py
         tile_overlap: Optional[int], default None
             Overlap pixels between tiles.
         scaling_factor: int, default 4
             The scaling factor to use when downscaling high resolution images into low resolution images.
+
+        Raises
+        ------
+        ValueError
+            If 'tile_size' is not None and 'batch_size' is not 1, as prediction by tiles only supports batch_size of 1.
         """
         if images_save_folder:
             if os.path.exists(images_save_folder):
@@ -360,85 +371,64 @@ class SRGAN(SuperResolutionModelBase):
             print("Warning! As we use high resolution images as model input, test_dataset should have 'normalize_hr' "
                   "set to True (currently False).")
 
+        if tile_size and batch_size != 1:
+            raise ValueError(f"Prediction is made by tile as 'tile_size' is specified. Only batch_size of 1"
+                             f" is supported, but is '{batch_size}'. To predict tiles by batch, please use "
+                             f"'tile_batch_size'.")
+
         device = torch.device('cuda') if torch.cuda.is_available() and not force_cpu else torch.device('cpu')
         self.generator.to(device)
         self.generator.eval()
 
         # pin_memory can lead to too much pagination memory needed.
-        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=1)
         total_batch = len(data_loader)
 
         start = time()
 
         with torch.no_grad():
-            for i_batch, (_, hr_images) in enumerate(data_loader):
+            for i_batch, (_, images) in enumerate(data_loader):
 
                 if tile_size:
-                    batch, channel, height, width = hr_images.shape
-                    output_height = height * scaling_factor
-                    output_width = width * scaling_factor
-                    output_shape = (batch, channel, output_height, output_width)
+                    image = images[0]  # batch_size must be 1
 
-                    # Start with a black image (on CPU as GPU is not needed)
-                    sr_images = hr_images.new_zeros(output_shape)
+                    # 1. Get tiles from input image
+                    tiles = get_tiles_from_image(image, tile_size, tile_overlap)
+
+                    # Retrieve tiles by row and by col to merge predictions
+                    channel, height, width = image.shape
                     tiles_x = ceil(width / tile_size)
                     tiles_y = ceil(height / tile_size)
 
-                    # loop over all tiles
-                    for index_y in range(tiles_y):  # TODO GPU all in one batch. Add padding .
-                        for index_x in range(tiles_x):
-                            # Extract tile from input image
-                            offset_x = index_x * tile_size
-                            offset_y = index_y * tile_size
+                    sr_tiles = torch.empty(
+                        (tiles_x * tiles_y, channel, scaling_factor * (tile_size + 2 * tile_overlap),
+                         scaling_factor * (tile_size + 2 * tile_overlap)))
 
-                            # Input tile area on total image
-                            input_start_x = offset_x
-                            input_end_x = min(offset_x + tile_size, width)
-                            input_start_y = offset_y
-                            input_end_y = min(offset_y + tile_size, height)
+                    # 2. Loop over all tiles to make predictions
 
-                            # Input tile area on total image with overlapping.
-                            input_start_x_overlap = max(input_start_x - tile_overlap, 0)
-                            input_end_x_overlap = min(input_end_x + tile_overlap, width)
-                            input_start_y_overlap = max(input_start_y - tile_overlap, 0)
-                            input_end_y_overlap = min(input_end_y + tile_overlap, height)
+                    batches = torch.split(tiles, tile_batch_size, dim=0)  # Create batches of tiles
+                    total_batch = len(batches)
 
-                            # Input tile dimensions
-                            input_tile_width = input_end_x - input_start_x
-                            input_tile_height = input_end_y - input_start_y
-                            tile_index = index_y * tiles_x + index_x + 1
-                            input_tile = hr_images[:, :, input_start_y_overlap:input_end_y_overlap,
-                                         input_start_x_overlap:input_end_x_overlap].to(device)
+                    for i_batch, batch in enumerate(batches):
+                        print(f'{i_batch + 1}/{total_batch} '
+                              f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
+                              f'{"-" * int(40 - 40 * (i_batch + 1) / total_batch)}] '
+                              f'- Duration {time() - start:.1f} s\r', end="")
+                        index_start = i_batch * tile_batch_size
+                        index_end = min((i_batch + 1) * tile_batch_size, tiles.size()[0])  # Last batch may be smaller.
+                        sr_tiles[index_start: index_end] = self.generator(batch.to(device))
 
-                            # Upscale overlapped tile
-                            output_tile = self.generator(input_tile)
-
-                            print(f'\tTile {tile_index}/{tiles_x * tiles_y}')
-
-                            # Get upscaled tile from upscaled overlapped tile
-                            output_start_x = input_start_x * scaling_factor
-                            output_end_x = input_end_x * scaling_factor
-                            output_start_y = input_start_y * scaling_factor
-                            output_end_y = input_end_y * scaling_factor
-
-                            # output tile area without padding
-                            output_start_x_tile = (input_start_x - input_start_x_overlap) * scaling_factor
-                            output_end_x_tile = output_start_x_tile + input_tile_width * scaling_factor
-                            output_start_y_tile = (input_start_y - input_start_y_overlap) * scaling_factor
-                            output_end_y_tile = output_start_y_tile + input_tile_height * scaling_factor
-
-                            # Add upscaled tile into output image
-                            sr_images[:, :, output_start_y:output_end_y, output_start_x:output_end_x] = \
-                                output_tile[:, :, output_start_y_tile:output_end_y_tile, output_start_x_tile: output_end_x_tile]
+                    # 3. Merge upscaled tiles: retrieve index and position from indexes
+                    sr_images = get_image_from_tiles(sr_tiles, tile_size, tile_overlap, scaling_factor, image)
 
                 else:
-                    sr_images = self.generator(hr_images.to(device))
+                    sr_images = self.generator(images.to(device))
 
                 # Save images
                 if images_save_folder:
                     for i in range(sr_images.size(0)):
                         save_image(sr_images[i, :, :, :],
-                                   os.path.join(images_save_folder, f'{i_batch * batch_size + i}.png'))
+                                   os.path.join(images_save_folder, f'{i_batch + i}.png'))
 
                 print(f'{i_batch + 1}/{total_batch} '
                       f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
