@@ -30,12 +30,12 @@ def get_tiles_from_image(image: tensor, tile_size: int, tile_overlap: int):
     tiles_x = ceil(width / tile_size)
     tiles_y = ceil(height / tile_size)
 
-    # 1st padding: image width and height should be multiple of tile_size
-    pad_x = (tiles_x * tile_size - width) // 2
-    pad_y = (tiles_y * tile_size - height) // 2
+    # 1st padding: image width and height should be multiple of tile_size #TODO prendre le max des pad des deux ( + 1 si pas divisible par deux ?)?
+    pad_x = ceil((tiles_x * tile_size - width) / 2)
+    pad_y = ceil((tiles_y * tile_size - height) / 2)
 
     # Reflects helps the model to improve super res
-    image = Pad((pad_y, pad_x, pad_y, pad_x), padding_mode="reflect")(image)
+    image = Pad((pad_x, pad_y, pad_x, pad_y), padding_mode="reflect")(image)
 
     # 2nd padding: add overlap size to each image side
     image = Pad((tile_overlap, tile_overlap, tile_overlap, tile_overlap), padding_mode="reflect")(image)
@@ -71,7 +71,8 @@ def get_tiles_from_image(image: tensor, tile_size: int, tile_overlap: int):
     return output
 
 
-def get_image_from_tiles(sr_tiles: tensor, tile_size: int, tile_overlap: int, scaling_factor: int, image: tensor) -> tensor:
+def get_image_from_tiles(sr_tiles: tensor, tile_size: int, tile_overlap: int, scaling_factor: int,
+                         image: tensor) -> tensor:
     """
     Merge upscaled tiles to get an upscaled image.
 
@@ -98,8 +99,8 @@ def get_image_from_tiles(sr_tiles: tensor, tile_size: int, tile_overlap: int, sc
     tiles_y = ceil(height / tile_size)
 
     # Start with a black image
-    sr_images = hr_image.new_zeros((channel, tiles_x * scaling_factor * tile_size,
-                                    tiles_y * tile_size * scaling_factor))
+    sr_images = image.new_zeros((channel, tiles_y * tile_size * scaling_factor,
+                                 tiles_x * tile_size * scaling_factor))
 
     for index_tile, tile in enumerate(sr_tiles):
         # Retrieve cropped tile from padded tile.
@@ -108,7 +109,7 @@ def get_image_from_tiles(sr_tiles: tensor, tile_size: int, tile_overlap: int, sc
                        tile_overlap * scaling_factor:(tile_overlap + tile_size) * scaling_factor]
 
         index_tile_x = index_tile % tiles_x
-        index_tile_y = index_tile // tiles_y
+        index_tile_y = index_tile // tiles_x
 
         sr_images[:,
         index_tile_y * tile_size * scaling_factor: (index_tile_y + 1) * tile_size * scaling_factor,
@@ -116,11 +117,8 @@ def get_image_from_tiles(sr_tiles: tensor, tile_size: int, tile_overlap: int, sc
         ] = tile_cropped
 
     # Remove padding
-    tiles_x = ceil(width / tile_size)
-    tiles_y = ceil(height / tile_size)
-
-    pad_x = scaling_factor * (tiles_x * tile_size - width) // 2
-    pad_y = scaling_factor * (tiles_y * tile_size - height) // 2
+    pad_x = scaling_factor * ceil((tiles_x * tile_size - width) / 2)
+    pad_y = scaling_factor * ceil((tiles_y * tile_size - height) / 2)
 
     sr_images = sr_images[:, pad_y:-pad_y, pad_x:-pad_x]  # Remove padding
     sr_images = torch.unsqueeze(sr_images, 0)  # Add the batch dimension

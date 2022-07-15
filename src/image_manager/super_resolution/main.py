@@ -27,11 +27,12 @@ if __name__ == "__main__":
     # Running task.
     if config["task"] == "train":
         train_dataset = SuperResolutionData(image_folder=os.path.join(*config["paths"]["train_set"].split('/')),
-                                            is_train_split=True,
+                                            crop_size=config['train']['crop_size'],
+                                            crop_type='random',
                                             normalize_lr=True)
 
         val_dataset = SuperResolutionData(image_folder=os.path.join(*config["paths"]["val_set"].split('/')),
-                                          is_train_split=False,
+                                          crop_type='center',
                                           normalize_lr=True)
 
         # One config file by model type.
@@ -52,7 +53,7 @@ if __name__ == "__main__":
 
         for image_folder, images_save_folder in zip(config["paths"]["test_set"], config["paths"]["test_images_save"]):
             test_dataset = SuperResolutionData(image_folder=image_folder,
-                                               is_train_split=False,
+                                               crop_type='center',
                                                normalize_lr=True)
 
             psnr, ssim = model.evaluate(val_dataset=test_dataset,
@@ -70,7 +71,7 @@ if __name__ == "__main__":
 
         for image_folder, images_save_folder in zip(config["paths"]["test_set"], config["paths"]["test_images_save"]):
             test_dataset = SuperResolutionData(image_folder=image_folder,
-                                               is_train_split=False,
+                                               crop_type=config["crop_type"],
                                                normalize_hr=True)
 
             model.predict(test_dataset=test_dataset,

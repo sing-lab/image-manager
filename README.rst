@@ -68,6 +68,14 @@ Then click on the link to access the app.
 To use with GPU, NVIDIA cuda driver must be installed.
 Please see the `Command-line Reference <Usage_>`_ for details.
 
+To predict an image:
+
+- predict the whole image in one run
+Can lead to out of memory for big images
+
+SuperResolutionData
+
+- predict image tiles
 
 Contributing
 ------------
