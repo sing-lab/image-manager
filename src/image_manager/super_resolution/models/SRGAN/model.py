@@ -324,8 +324,8 @@ class SRGAN(SuperResolutionModelBase):
         return sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
 
     def predict(self, test_dataset: SuperResolutionData, images_save_folder: str = "", batch_size: int = 1,
-                force_cpu: bool = True, tile_size: int = 96, tile_overlap: Optional[int] = 10,
-                tile_batch_size: Optional[int] = 1,
+                force_cpu: bool = True, tile_size: Optional[int] = None, tile_overlap: Optional[int] = 10,
+                tile_batch_size: Optional[int] = None,
                 scaling_factor: int = 4,
                 ) \
             -> None:
@@ -339,13 +339,13 @@ class SRGAN(SuperResolutionModelBase):
             The images to process.
         batch_size: int, default 1
             The batch size for predictions. If prediction made by tiles, batch_size should be 1.
-        tile_batch_size: int, default 1
+        tile_batch_size: Optional[int], default None
             Images are processed one by one, however tiles for a given image can be processed by batches.
         images_save_folder: str
             The folder where to save predicted images.
         force_cpu: bool
             Whether to force usage of CPU or not (inference on high resolution images may run GPU out of memory).
-        tile_size: int, default 0
+        tile_size: Optional[int], default None
             As too large images result in the out of GPU memory issue, tile option will first crop input images into
             tiles, then process each of them. Finally, they will be merged into one image. 0: not used tiles.
             It is advised to use the same tile_size as low resolution image in the training.

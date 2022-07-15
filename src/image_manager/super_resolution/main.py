@@ -76,6 +76,8 @@ if __name__ == "__main__":
 
             model.predict(test_dataset=test_dataset,
                           tile_batch_size=config["tile_batch_size"],
+                          tile_size=config["tile_size"],
+                          tile_overlap=config["tile_overlap"],
                           force_cpu=config["force_cpu"],
                           images_save_folder=os.path.join(*images_save_folder.split('/'),
                                                           *config["experiment_name"].split('/'))

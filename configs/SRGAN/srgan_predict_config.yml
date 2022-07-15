@@ -9,6 +9,8 @@ force_cpu: False
 
 
 tile_batch_size: 8  # Allow to reduce memory usage using tiles predictions.
+tile_size: 96
+tile_overlap: 10
 crop_type: 'no_crop'  # Allow to predict rectangle images.
 
 # If we don't want to use tiles and predict image in one run, we should set crop_type to 'center'
