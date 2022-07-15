@@ -120,7 +120,11 @@ def get_image_from_tiles(sr_tiles: tensor, tile_size: int, tile_overlap: int, sc
     pad_x = scaling_factor * ceil((tiles_x * tile_size - width) / 2)
     pad_y = scaling_factor * ceil((tiles_y * tile_size - height) / 2)
 
-    sr_images = sr_images[:, pad_y:-pad_y, pad_x:-pad_x]  # Remove padding
+    if pad_x:
+        sr_images = sr_images[:, :, pad_x:-pad_x]  # Remove padding
+    if pad_y:
+        sr_images = sr_images[:, pad_y:-pad_y, :]  # Remove padding
+
     sr_images = torch.unsqueeze(sr_images, 0)  # Add the batch dimension
 
     return sr_images

@@ -24,7 +24,7 @@ def get_prediction(image_path):
         try:
             print("Try to use GPU", flush=True)
             model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
-                          force_cpu=False, tile_batch_size=8)
+                          force_cpu=False, tile_batch_size=8, tile_size=96, tile_overlap=10)
         except (RuntimeError, OSError):  # CUDA out of memory: try to predict using CPU only.
             print("Not enough GPU memory: will run on CPU", flush=True)
             model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
