@@ -7,15 +7,19 @@ task: 'predict'  # in ('train', 'test', 'predict')
 reverse_normalize: True
 force_cpu: False
 
+crop_type: 'no_crop'  # Allow to predict rectangle images.
 
+# Prediction using tiles:
 tile_batch_size: 8  # Allow to reduce memory usage using tiles predictions.
 tile_size: 96
 tile_overlap: 10
-crop_type: 'no_crop'  # Allow to predict rectangle images.
 
-# If we don't want to use tiles and predict image in one run, we should set crop_type to 'center'
+# Normal prediction (no tiles):
+#tile_batch_size: null
+#tile_size: null
+#tile_overlap: null
 
 paths:
-  test_set: [ '../../../data/raw/predict' ]
-  test_images_save: [ '../../../data/processed/predict/' ]
+  test_set: ['../../../data/raw/predict']
+  test_images_save: ['../../../data/processed/predict/']
 

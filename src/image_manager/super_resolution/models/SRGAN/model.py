@@ -197,7 +197,7 @@ class SRGAN(SuperResolutionModelBase):
             # Evaluation step.
             psnr, ssim = self.evaluate(val_dataset,
                                        batch_size=1,
-                                       images_save_folder=f"{images_save_folder}_epoch_{str(epoch + 1)}")
+                                       images_save_folder=f"{images_save_folder}_epoch_{epoch + 1}")
 
             writer.add_scalar("Val/PSNR", psnr, epoch + 1)
             writer.add_scalar("Val/SSIM", ssim, epoch + 1)
@@ -234,7 +234,7 @@ class SRGAN(SuperResolutionModelBase):
         ----------
         val_dataset: SuperResolutionData
             dataset to use for testing.
-        batch_size: int, default 16
+        batch_size: int, default 1
             batch size for evaluation.
         images_save_folder: str, default ""
             Folder to save generated images.
@@ -324,7 +324,7 @@ class SRGAN(SuperResolutionModelBase):
         return sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
 
     def predict(self, test_dataset: SuperResolutionData, images_save_folder: str = "", batch_size: int = 1,
-                force_cpu: bool = True, tile_size: Optional[int] = None, tile_overlap: Optional[int] = 10,
+                force_cpu: bool = True, tile_size: Optional[int] = None, tile_overlap: Optional[int] = None,
                 tile_batch_size: Optional[int] = None,
                 scaling_factor: int = 4,
                 ) \
