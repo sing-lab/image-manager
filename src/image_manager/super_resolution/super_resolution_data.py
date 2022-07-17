@@ -1,5 +1,5 @@
 """Module defining class to store data or super resolution model."""
-from typing import Tuple
+from typing import Tuple, Optional
 
 from torch import tensor
 from torch.utils.data import Dataset
@@ -15,7 +15,7 @@ class SuperResolutionData(Dataset):
     Each High Resolution image is cropped to a squared size, then downscaled to make the Low resolution image.
     """
 
-    def __init__(self, image_folder: str, is_train_split: bool = False, crop_size: int = 96, scaling_factor: int = 4,
+    def __init__(self, image_folder: str, crop_type: str, crop_size: Optional[int] = None, scaling_factor: int = 4,
                  normalize_lr: bool = True, normalize_hr: bool = False):
         """
 
@@ -23,7 +23,12 @@ class SuperResolutionData(Dataset):
         ----------
         image_folder: str
             A folder containing images.
-        crop_size: int, default 96
+        crop_type: str
+            The type of crop. Should be in
+              - "center": for test and val split, takes the largest possible (squared) center-crop.
+              - "random": for train split, takes random crop of size crop_size.
+              - "no_crop": for prediction, allows to predict non-squared images.
+        crop_size: int, default None
             The target size for high resolution images for train set. Test set: images are not cropped to a fixed size.
         scaling_factor: int, default 4
             The scaling factor to use when downscaling high resolution images into low resolution images.
@@ -31,13 +36,12 @@ class SuperResolutionData(Dataset):
             Whether to normalize images (using imageNET statistics as we use similar images) or not.
         normalize_hr: bool, default False
             Whether to normalize images (using imageNET statistics as we use similar images) or not.
-        is_train_split: bool, default False
-            Whether the current split it a train split (test and validation data should not use RandomCrop).
 
         Raises
         ------
         ValueError
-            If the crop_size is not divisible by scaling_factor, or split not in 'train', 'test', 'validation'.
+            If the crop_size is not divisible by scaling_factor, or crop_type not in 'random', 'center', 'no_crop',
+            or crop_type is 'random' but no crop_size is specified.
 
         """
         if crop_size is not None and crop_size % scaling_factor != 0:
@@ -45,11 +49,18 @@ class SuperResolutionData(Dataset):
                               dimensions of the original high resolution patches and their super-resolved \
                               (reconstructed) versions!")
 
+        crop_type = crop_type.lower()
+        if crop_type == 'random' and crop_size is None:
+            raise ValueError("As crop_type is 'random', 'crop_size' must be specified")
+
+        if crop_type not in ('random', 'center', 'no_crop'):
+            raise ValueError("crop_type value must be in 'random', 'center', or 'no_crop'")
+
         self.images_path = [os.path.join(image_folder, image_name) for image_name in os.listdir(image_folder)]
         self.image_folder = image_folder
         self.crop_size = crop_size
+        self.crop_type = crop_type
         self.scaling_factor = scaling_factor
-        self.is_train_split = is_train_split
         self.normalize_lr = normalize_lr
         self.normalize_hr = normalize_hr
 
@@ -74,14 +85,16 @@ class SuperResolutionData(Dataset):
         image = image.convert('RGB')
 
         # 1. Crop original image to make the high resolution image (in [0, 1]).
-        if self.is_train_split:
+        if self.crop_type == 'random':  # For training
             transform_hr = Compose([RandomCrop(self.crop_size), ToTensor()])
-        else:
+        elif self.crop_type == 'center':  # For evaluation and testing
             # Take the largest possible (squared) center-crop such that dimensions are divisible by the scaling factor.
             original_height, original_width = image.size
             crop_size = min((original_height - original_height % self.scaling_factor,
                              original_width - original_width % self.scaling_factor))
             transform_hr = Compose([CenterCrop(crop_size), ToTensor()])
+        else:
+            transform_hr = Compose([ToTensor()])
 
         # 2. Downscale image to  make the low resolution image.
         high_res_image = transform_hr(image)

@@ -1,22 +1,24 @@
 """SrResNet_training_V1 model."""
 import os
-from datetime import datetime
+import shutil
+import numpy as np
 from time import time
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
+from datetime import datetime
+
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILImage, Normalize
 from models.super_resolution_model_base import SuperResolutionModelBase
 from models.SRGAN.generator import Generator
+from models.utils_models import get_tiles_from_image, get_image_from_tiles
 
-import numpy as np
 import torch
 from torch.nn import MSELoss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image, make_grid
 from super_resolution_data import SuperResolutionData
-import shutil
 
 
 class SRResNet(SuperResolutionModelBase):
@@ -84,10 +86,10 @@ class SRResNet(SuperResolutionModelBase):
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         self.generator.to(device)
 
-        best_val_loss = np.inf
-
         data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, pin_memory=True, num_workers=4,
                                  persistent_workers=True)
+
+        best_val_loss = np.inf
 
         # Initialize generator's optimizer
         optimizer = Adam(params=filter(lambda p: p.requires_grad, self.generator.parameters()), lr=learning_rate)
@@ -107,8 +109,8 @@ class SRResNet(SuperResolutionModelBase):
             total_batch = len(data_loader)
 
             # lr/hr/sr: low/high/super resolution
+            # Training step.
             for i_batch, (lr_images, hr_images) in enumerate(data_loader):
-                optimizer.zero_grad()
 
                 lr_images = lr_images.to(device)  # In [0, 1] then normalized
                 hr_images = hr_images.to(device)  # In [0, 1]
@@ -122,6 +124,7 @@ class SRResNet(SuperResolutionModelBase):
 
                 # Step: update model parameters.
                 optimizer.step()
+                self.generator.zero_grad(set_to_none=True)
 
                 print(f'{i_batch + 1}/{total_batch} '
                       f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
@@ -135,9 +138,10 @@ class SRResNet(SuperResolutionModelBase):
 
                 running_loss += loss.item()
 
+            # Evaluation step.
             val_loss, psnr, ssim = self.evaluate(val_dataset,
                                                  batch_size=1,  # val images can have different size.
-                                                 images_save_folder=images_save_folder + "_epoch_" + str(epoch + 1))
+                                                 images_save_folder=f"{images_save_folder}_epoch_{epoch + 1}")
 
             writer.add_scalar("Val/PSNR", psnr, epoch + 1)
             writer.add_scalar("Val/SSIM", ssim, epoch + 1)
@@ -165,7 +169,6 @@ class SRResNet(SuperResolutionModelBase):
                  reverse_normalize: bool = True) -> Tuple[float, float, float]:
         """
         Main function to test the model, using PSNR and SSIM.
-        No validation data should be provided as GAN cannot be monitored using a validation loss.
 
         PSNR [dB] and SSIM measures are calculated on the y-channel of center-cropped, removal of a 4-pixel wide strip
         from each border PSNR is computed on the Y channel (luminance) of the YCbCr image.
@@ -184,7 +187,7 @@ class SRResNet(SuperResolutionModelBase):
         Returns
         -------
         Tuple[float, float, float]
-            Average validation loss, psnr, ssim.
+            Average validation loss, PSNR and SSIM.
         """
         if images_save_folder:
             if os.path.exists(images_save_folder):
@@ -217,8 +220,9 @@ class SRResNet(SuperResolutionModelBase):
 
         start = time()
 
+        self.generator.eval()
+
         with torch.no_grad():
-            self.generator.eval()
 
             for i_batch, (lr_images, hr_images) in enumerate(data_loader):
                 lr_images = lr_images.to(device)
@@ -231,7 +235,6 @@ class SRResNet(SuperResolutionModelBase):
                 # Save images.
                 if images_save_folder and (total_batch <= 10 or i_batch % (total_batch // 10) == 0):
                     for i in range(sr_images.size(0)):
-
                         if reverse_normalize:
                             lr_images[i, :, :, :] = denormalize(lr_images[i, :, :, :])
 
@@ -270,8 +273,12 @@ class SRResNet(SuperResolutionModelBase):
 
         return sum(val_losses) / len(val_losses), sum(all_psnr) / len(all_psnr), sum(all_ssim) / len(all_ssim)
 
-    def predict(self, test_dataset: SuperResolutionData, batch_size: int = 1, images_save_folder: str = "",
-                force_cpu: bool = True) -> None:
+    def predict(self, test_dataset: SuperResolutionData, images_save_folder: str = "", batch_size: int = 1,
+                force_cpu: bool = True, tile_size: Optional[int] = None, tile_overlap: Optional[int] = None,
+                tile_batch_size: Optional[int] = None,
+                scaling_factor: int = 4,
+                ) \
+            -> None:
         """
         Process an image into super resolution.
         We use high resolution images as input, therefore test_dataset should have parameter normalize_hr set to True.
@@ -280,13 +287,28 @@ class SRResNet(SuperResolutionModelBase):
         ----------
         test_dataset: SuperResolutionData
             The images to process.
-        batch_size: int, default 16
-            The batch size for predictions.
+        batch_size: int, default 1
+            The batch size for predictions. If prediction made by tiles, batch_size should be 1.
+        tile_batch_size: Optional[int], default None
+            Images are processed one by one, however tiles for a given image can be processed by batches.
         images_save_folder: str
             The folder where to save predicted images.
         force_cpu: bool
             Whether to force usage of CPU or not (inference on high resolution images may run GPU out of memory).
+        tile_size: Optional[int], default None
+            As too large images result in the out of GPU memory issue, tile option will first crop input images into
+            tiles, then process each of them. Finally, they will be merged into one image. 0: not used tiles.
+            It is advised to use the same tile_size as low resolution image in the training.
+            Adapted from https://github.com/ata4/esrgan-launcher/blob/master/upscale.py
+        tile_overlap: Optional[int], default None
+            Overlap pixels between tiles.
+        scaling_factor: int, default 4
+            The scaling factor to use when downscaling high resolution images into low resolution images.
 
+        Raises
+        ------
+        ValueError
+            If 'tile_size' is not None and 'batch_size' is not 1, as prediction by tiles only supports batch_size of 1.
         """
         if images_save_folder:
             if os.path.exists(images_save_folder):
@@ -299,27 +321,64 @@ class SRResNet(SuperResolutionModelBase):
             print("Warning! As we use high resolution images as model input, test_dataset should have 'normalize_hr' "
                   "set to True (currently False).")
 
+        if tile_size and batch_size != 1:
+            raise ValueError(f"Prediction is made by tile as 'tile_size' is specified. Only batch_size of 1"
+                             f" is supported, but is '{batch_size}'. To predict tiles by batch, please use "
+                             f"'tile_batch_size'.")
+
         device = torch.device('cuda') if torch.cuda.is_available() and not force_cpu else torch.device('cpu')
         self.generator.to(device)
         self.generator.eval()
 
         # pin_memory can lead to too much pagination memory needed.
-        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-
+        data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=1)
         total_batch = len(data_loader)
 
         start = time()
 
         with torch.no_grad():
-            for i_batch, (lr_images, hr_images) in enumerate(data_loader):
-                hr_images = hr_images.to(device)
-                sr_images = self.generator(hr_images)
+            for i_batch, (_, images) in enumerate(data_loader):
+
+                if tile_size:
+                    image = images[0]  # batch_size must be 1
+
+                    # 1. Get tiles from input image
+                    tiles = get_tiles_from_image(image, tile_size, tile_overlap)
+
+                    # Retrieve tiles by row and by col to merge predictions
+                    channel, height, width = image.shape
+                    tiles_x = ceil(width / tile_size)
+                    tiles_y = ceil(height / tile_size)
+
+                    sr_tiles = torch.empty(
+                        (tiles_x * tiles_y, channel, scaling_factor * (tile_size + 2 * tile_overlap),
+                         scaling_factor * (tile_size + 2 * tile_overlap)))
+
+                    # 2. Loop over all tiles to make predictions
+
+                    batches = torch.split(tiles, tile_batch_size, dim=0)  # Create batches of tiles
+                    total_batch = len(batches)
+
+                    for i_batch, batch in enumerate(batches):
+                        print(f'{i_batch + 1}/{total_batch} '
+                              f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
+                              f'{"-" * int(40 - 40 * (i_batch + 1) / total_batch)}] '
+                              f'- Duration {time() - start:.1f} s\r', end="")
+                        index_start = i_batch * tile_batch_size
+                        index_end = min((i_batch + 1) * tile_batch_size, tiles.size()[0])  # Last batch may be smaller.
+                        sr_tiles[index_start: index_end] = self.generator(batch.to(device))
+
+                    # 3. Merge upscaled tiles: retrieve index and position from indexes
+                    sr_images = get_image_from_tiles(sr_tiles, tile_size, tile_overlap, scaling_factor, image)
+
+                else:
+                    sr_images = self.generator(images.to(device))
 
                 # Save images
                 if images_save_folder:
                     for i in range(sr_images.size(0)):
                         save_image(sr_images[i, :, :, :],
-                                   os.path.join(images_save_folder, f'{i_batch * batch_size + i}.png'))
+                                   os.path.join(images_save_folder, f'{i_batch + i}.png'))
 
                 print(f'{i_batch + 1}/{total_batch} '
                       f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'

@@ -2,8 +2,11 @@
 
 experiment_name: 'SRGAN/training_V1'
 model_type: 'SRGAN'
-from_pretrained: 'False' # False: only pretrained generator. True: pretrained generator and discriminator (trained SRGAN).
+from_pretrained: False # False: only pretrained generator. True: pretrained generator and discriminator (trained SRGAN).
 task: 'train'  # in ('train', 'test', 'predict')
+
+train:
+  crop_size: 96
 
 paths:
   model_save: '../../../models/super_resolution/'
@@ -12,6 +15,6 @@ paths:
   val_images_save: '../../../data/processed/val/'
 
 hyperparameters:
-  batch_size: 4
-  epochs: 52
+  batch_size: 32
+  epochs: 104
   learning_rate: 0.0001

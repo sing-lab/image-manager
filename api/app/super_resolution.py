@@ -18,17 +18,17 @@ def get_prediction(image_path):
     image = Image.open(image_path)
     with TemporaryDirectory() as dataset_folder:
         image.save(os.path.join(dataset_folder, image_name))
-        dataset = SuperResolutionData(image_folder=dataset_folder, is_train_split=False, scaling_factor=4,
+        dataset = SuperResolutionData(image_folder=dataset_folder, scaling_factor=4, crop_type='no_crop',
                                       normalize_hr=True)
 
         try:
             print("Try to use GPU", flush=True)
             model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
-                          force_cpu=False)
+                          force_cpu=False, tile_batch_size=4, tile_size=96, tile_overlap=10)
         except (RuntimeError, OSError):  # CUDA out of memory: try to predict using CPU only.
-            print("Not enough GPU memory: will run on CPU", flush=True)
+            print("Not enough GPU memory: will run on CPU.", flush=True)
             model.predict(test_dataset=dataset, images_save_folder=os.path.join(dataset_folder, "predictions"),
-                          force_cpu=True)
+                          force_cpu=True, tile_batch_size=8, tile_size=96, tile_overlap=10)
 
         # Save image for user display.
         sr_image_path = os.path.join("static", "images", f"sr_{image_name}")

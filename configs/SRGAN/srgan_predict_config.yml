@@ -2,12 +2,24 @@
 
 experiment_name: 'SRGAN/predict_V1'
 model_type: 'SRGAN'
-from_pretrained: 'True' # False: only pretrained generator. True: pretrained generator and discriminator (trained SRGAN).
+from_pretrained: True # False: only pretrained generator. True: pretrained generator and discriminator (trained SRGAN).
 task: 'predict'  # in ('train', 'test', 'predict')
-reverse_normalize: 'True'
-force_cpu: 'True'
+reverse_normalize: True
+force_cpu: False
+
+crop_type: 'no_crop'  # Allow to predict rectangle images.
+
+# Prediction using tiles:
+tile_batch_size: 8  # Allow to reduce memory usage using tiles predictions.
+tile_size: 96
+tile_overlap: 10
+
+# Normal prediction (no tiles):
+#tile_batch_size: null
+#tile_size: null
+#tile_overlap: null
 
 paths:
-  test_set: [ '../../../data/raw/predict' ]
-  test_images_save: [ '../../../data/processed/predict/' ]
+  test_set: ['../../../data/raw/predict']
+  test_images_save: ['../../../data/processed/predict/']
 
