@@ -73,3 +73,4 @@ ENV PYTHONPATH="${PYTHONPATH}:/super_resolution"
 
 # Since Flask apps listen to port 5000  by default, we expose it
 EXPOSE 5000
+

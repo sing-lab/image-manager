@@ -1,0 +1,6 @@
+[server]
+port = 5000
+maxUploadSize = 500  # Maximum upload size for a file (in mb)
+
+[browser]
+gatherUsageStats = false
