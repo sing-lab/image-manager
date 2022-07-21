@@ -7,7 +7,6 @@ from models.SRResNet.model import SRResNet
 from models.SRGAN.discriminator import Discriminator
 from models.SRGAN.generator import Generator
 from models.SRGAN.model import SRGAN
-from models.SRGAN.utils_loss import TruncatedVGG
 
 from models.super_resolution_model_base import SuperResolutionModelBase
 
@@ -40,7 +39,7 @@ def get_model_from_enum(model: ModelEnum, from_pretrained: bool = False) -> Supe
         model from enum
     """
     if model.name.lower() == 'srgan':
-        base_model = SRGAN(discriminator=Discriminator(), generator=Generator(), truncated_vgg=TruncatedVGG())
+        base_model = SRGAN(discriminator=Discriminator(), generator=Generator())
         if from_pretrained:
             for path in ["/", "../../", "../../../"]:  # docker image: '/' - app: '../..' - main: '../../../'
                 try:
@@ -60,11 +59,12 @@ def get_model_from_enum(model: ModelEnum, from_pretrained: bool = False) -> Supe
 
     if model.name.lower() == 'srresnet':
         base_model = SRResNet()
-        for path in ["/", "../../", "../../../"]:  # docker image: '/' - app: '../..' - main: '../../../'
-            try:
-                base_model.load(generator=os.path.join(path, "models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch"))
-            except FileNotFoundError:  # On docker image
-                continue
+        if from_pretrained:
+            for path in ["/", "../../", "../../../"]:  # docker image: '/' - app: '../..' - main: '../../../'
+                try:
+                    base_model.load(generator=os.path.join(path, "models/super_resolution/SrResNet/training_V1/best_generator_epoch_30.torch"))
+                except FileNotFoundError:  # On docker image
+                    continue
 
         return base_model
 

@@ -55,6 +55,8 @@ RUN poe force-cuda11
 # Stage 3: `production` image used for runtime
 FROM python-base as production
 
+RUN apt-get update && apt-get install -y ffmpeg # Lib for streamlit image comparison
+
 COPY --from=builder-base $VENV_PATH $VENV_PATH
 
 # Install project
@@ -70,7 +72,3 @@ COPY api/app /app
 
 # Add project root to path (not to $PATH !)
 ENV PYTHONPATH="${PYTHONPATH}:/super_resolution"
-
-# Since Flask apps listen to port 5000  by default, we expose it
-EXPOSE 5000
-

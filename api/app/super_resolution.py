@@ -15,12 +15,11 @@ def get_prediction(image: Image) -> Image:
     """
     Process an image.
     """
-
     images_save_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "predictions")
     with TemporaryDirectory() as dataset_folder:
         image.save(os.path.join(dataset_folder, image.filename))
         dataset = SuperResolutionData(image_folder=dataset_folder, scaling_factor=4, crop_type='no_crop',
-                                      normalize_hr=True)
+                                      normalize_hr=False)
         try:
             print("Using GPU", flush=True)
             model.predict(test_dataset=dataset, images_save_folder=images_save_folder,

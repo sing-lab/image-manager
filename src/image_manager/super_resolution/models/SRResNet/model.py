@@ -9,10 +9,10 @@ from datetime import datetime
 
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 from torch.utils.tensorboard import SummaryWriter
-from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILImage, Normalize
+from torchvision.transforms import Compose, ToTensor, CenterCrop, Resize, ToPILImage
 from models.super_resolution_model_base import SuperResolutionModelBase
 from models.SRGAN.generator import Generator
-from models.utils_models import get_tiles_from_image, get_image_from_tiles
+from models.utils_models import get_tiles_from_image, get_image_from_tiles, RGB_WEIGHTS
 
 import torch
 from torch.nn import MSELoss
@@ -206,13 +206,6 @@ class SRResNet(SuperResolutionModelBase):
 
         content_loss = MSELoss().to(device)
 
-        rgb_weights = torch.FloatTensor([65.481, 128.553, 24.966]).to(device)
-
-        # Reverse normalization of lr_images
-        if reverse_normalize:
-            denormalize = Normalize(mean=[-0.475 / 0.262, -0.434 / 0.252, -0.392 / 0.262],
-                                    std=[1 / 0.262, 1 / 0.252, 1 / 0.262])
-
         transform = Compose([ToPILImage(), Resize(400), CenterCrop(400), ToTensor()])
 
         data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4,
@@ -237,7 +230,8 @@ class SRResNet(SuperResolutionModelBase):
                 if images_save_folder and (total_batch <= 10 or i_batch % (total_batch // 10) == 0):
                     for i in range(sr_images.size(0)):
                         if reverse_normalize:
-                            lr_images[i, :, :, :] = denormalize(lr_images[i, :, :, :])
+                            # Reverse normalization of lr_images
+                            lr_images[i, :, :, :] = val_dataset.reverse_normalize(lr_images[i, :, :, :])
 
                         images = torch.stack([transform(lr_images[i, :, :, :]),
                                               transform(sr_images[i, :, :, :]),
@@ -251,8 +245,8 @@ class SRResNet(SuperResolutionModelBase):
                 sr_images = 255 * sr_images  # Map from [0, 1] to [0, 255]
 
                 # Use Y channel only (luminance) to compute PSNR and SSIM (RGB to YCbCr conversion)
-                sr_Y = torch.matmul(sr_images.permute(0, 2, 3, 1)[:, 4:-4, 4:-4, :], rgb_weights) / 255. + 16.
-                hr_Y = torch.matmul(hr_images.permute(0, 2, 3, 1)[:, 4:-4, 4:-4, :], rgb_weights) / 255. + 16.
+                sr_Y = torch.matmul(sr_images.permute(0, 2, 3, 1)[:, 4:-4, 4:-4, :], RGB_WEIGHTS.to(device)) / 255. + 16.
+                hr_Y = torch.matmul(hr_images.permute(0, 2, 3, 1)[:, 4:-4, 4:-4, :], RGB_WEIGHTS.to(device)) / 255. + 16.
 
                 # Change device
                 sr_Y = sr_Y.cpu().numpy()
@@ -276,10 +270,7 @@ class SRResNet(SuperResolutionModelBase):
 
     def predict(self, test_dataset: SuperResolutionData, images_save_folder: str = "", batch_size: int = 1,
                 force_cpu: bool = True, tile_size: Optional[int] = None, tile_overlap: Optional[int] = None,
-                tile_batch_size: Optional[int] = None,
-                scaling_factor: int = 4,
-                ) \
-            -> None:
+                tile_batch_size: Optional[int] = None, scaling_factor: int = 4) -> None:
         """
         Process an image into super resolution.
         We use high resolution images as input, therefore test_dataset should have parameter normalize_hr set to True.
@@ -318,9 +309,10 @@ class SRResNet(SuperResolutionModelBase):
         else:
             print("Images won't be saved. To save images, please specify a save folder path.")
 
-        if not test_dataset.normalize_hr:
-            print("Warning! As we use high resolution images as model input, test_dataset should have 'normalize_hr' "
-                  "set to True (currently False).")
+        if bool(test_dataset.normalize_hr) == bool(tile_size):
+            raise ValueError("When using prediction by tile, normalize_hr should be False as we normalize each tile"
+                             "one by one. When using normal prediction, normalize_hr should be True as we normalize the "
+                             "full image")
 
         if tile_size and batch_size != 1:
             raise ValueError(f"Prediction is made by tile as 'tile_size' is specified. Only batch_size of 1"
@@ -341,6 +333,7 @@ class SRResNet(SuperResolutionModelBase):
             for i_batch, (_, images) in enumerate(data_loader):
 
                 if tile_size:
+                    # Normalization will be applied on each tile independently.
                     image = images[0]  # batch_size must be 1
 
                     # 1. Get tiles from input image
@@ -367,6 +360,7 @@ class SRResNet(SuperResolutionModelBase):
                               f'- Duration {time() - start:.1f} s\r', end="")
                         index_start = i_batch * tile_batch_size
                         index_end = min((i_batch + 1) * tile_batch_size, tiles.size()[0])  # Last batch may be smaller.
+                        batch = test_dataset.normalize(batch)  # Normalize each tile.
                         sr_tiles[index_start: index_end] = self.generator(batch.to(device))
 
                     # 3. Merge upscaled tiles: retrieve index and position from indexes

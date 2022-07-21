@@ -66,6 +66,8 @@ class SuperResolutionData(Dataset):
 
         # Normalize images using ImageNET dataset statistics.
         self.normalize = Normalize(mean=[0.475, 0.434, 0.392], std=[0.262, 0.252, 0.262])
+        self.reverse_normalize = Normalize(mean=[-0.475 / 0.262, -0.434 / 0.252, -0.392 / 0.262],
+                                           std=[1 / 0.262, 1 / 0.252, 1 / 0.262])
 
     def __getitem__(self, idx: int) -> Tuple[tensor, tensor]:
         """
@@ -99,10 +101,10 @@ class SuperResolutionData(Dataset):
         # 2. Downscale image to  make the low resolution image.
         high_res_image = transform_hr(image)
         high_res_height, high_res_width = high_res_image.shape[1:]
-        
+
         transform_lr = Compose([ToPILImage(),  # Needed as interpolation can scale pixels out of [0, 1] (overshoot).
                                 Resize((high_res_height // self.scaling_factor, high_res_width // self.scaling_factor),
-                                interpolation=InterpolationMode.BICUBIC),
+                                       interpolation=InterpolationMode.BICUBIC),
                                 ToTensor()
                                 ])
 

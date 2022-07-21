@@ -61,9 +61,20 @@ You can install *Image_Manager* via pip_ from PyPI_:
 Usage
 -----
 
-In the terminal in the project root, run "docker-compose run --service-ports --rm app"
-You should authenticate clicking on the gdrive link, to download trained models
-Then click on the link to access the app.
+In a terminal, in project root, run:
+
+.. code:: console
+
+    $ docker-compose run --service-ports --rm app
+
+You should authenticate clicking on the gdrive link, to download trained models.
+
+Then access the app on:
+
+    http://localhost:8000
+
+Note: url shown in the terminal won't work as they are relative to the Docker container it’s running in
+
 
 To use with GPU, NVIDIA cuda driver must be installed.
 Please see the `Command-line Reference <Usage_>`_ for details.

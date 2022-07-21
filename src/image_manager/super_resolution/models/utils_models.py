@@ -1,8 +1,11 @@
 """utility functions for models"""
-from torch import tensor
-from math import ceil
+from torch import tensor, FloatTensor
 import torch
+from math import ceil
 from torchvision.transforms import Pad
+
+
+RGB_WEIGHTS = FloatTensor([65.481, 128.553, 24.966])
 
 
 def get_tiles_from_image(image: tensor, tile_size: int, tile_overlap: int):
@@ -130,3 +133,4 @@ def get_image_from_tiles(sr_tiles: tensor, tile_size: int, tile_overlap: int, sc
     sr_images = torch.unsqueeze(sr_images, 0)  # Add the batch dimension
 
     return sr_images
+

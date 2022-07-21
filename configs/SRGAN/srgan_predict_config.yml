@@ -13,11 +13,13 @@ crop_type: 'no_crop'  # Allow to predict rectangle images.
 tile_batch_size: 8  # Allow to reduce memory usage using tiles predictions.
 tile_size: 96
 tile_overlap: 10
+normalize_hr: False  # False when using tile as we will normalize each tile one by one
 
 # Normal prediction (no tiles):
 #tile_batch_size: null
 #tile_size: null
 #tile_overlap: null
+#normalize_hr: True  # We need to normalize the full image
 
 paths:
   test_set: ['../../../data/raw/predict']
