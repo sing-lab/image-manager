@@ -6,13 +6,11 @@ services:
       context: .
       dockerfile: Dockerfile
     command: >  # Download models with authentification, and run main script
-      sh -c "dvc pull models &&
-             cd app &&
-             python main.py"
-    volumes:  #TODO remove volume
-      - ../api/app/static/images:/app/data_container
+        sh -c "dvc pull models/super_resolution/SRGAN/Article/generator.torch &&
+               cd app &&
+               streamlit run main.py"
     ports:
-      - "5000:5000"  # mapping of <Host>:<Container> ports.
+      - "8000:5000"  # mapping of <Host>:<Container> ports.  => http://localhost:8880/
     ipc: host  # Increase the shared memory size for the container
     deploy:
       resources:

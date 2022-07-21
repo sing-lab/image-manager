@@ -72,7 +72,7 @@ if __name__ == "__main__":
         for image_folder, images_save_folder in zip(config["paths"]["test_set"], config["paths"]["test_images_save"]):
             test_dataset = SuperResolutionData(image_folder=image_folder,
                                                crop_type=config["crop_type"],
-                                               normalize_hr=True)
+                                               normalize_hr=config["normalize_hr"])
 
             model.predict(test_dataset=test_dataset,
                           tile_batch_size=config["tile_batch_size"],

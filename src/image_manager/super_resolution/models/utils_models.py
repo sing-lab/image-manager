@@ -1,8 +1,11 @@
 """utility functions for models"""
-from torch import tensor
-from math import ceil
+from torch import tensor, FloatTensor
 import torch
+from math import ceil
 from torchvision.transforms import Pad
+
+
+RGB_WEIGHTS = FloatTensor([65.481, 128.553, 24.966])
 
 
 def get_tiles_from_image(image: tensor, tile_size: int, tile_overlap: int):
@@ -30,15 +33,17 @@ def get_tiles_from_image(image: tensor, tile_size: int, tile_overlap: int):
     tiles_x = ceil(width / tile_size)
     tiles_y = ceil(height / tile_size)
 
-    # 1st padding: image width and height should be multiple of tile_size #TODO prendre le max des pad des deux ( + 1 si pas divisible par deux ?)?
     pad_x = ceil((tiles_x * tile_size - width) / 2)
     pad_y = ceil((tiles_y * tile_size - height) / 2)
 
-    # Reflects helps the model to improve super res
-    image = Pad((pad_x, pad_y, pad_x, pad_y), padding_mode="reflect")(image)
-
-    # 2nd padding: add overlap size to each image side
-    image = Pad((tile_overlap, tile_overlap, tile_overlap, tile_overlap), padding_mode="reflect")(image)
+    try:  # Reflects helps the model to improve super res
+        # 1st padding: image width and height should be multiple of tile_size
+        image = Pad((pad_x, pad_y, pad_x, pad_y), padding_mode="reflect")(image)
+        # 2nd padding: add overlap size to each image side
+        image = Pad((tile_overlap, tile_overlap, tile_overlap, tile_overlap), padding_mode="reflect")(image)
+    except RuntimeError:  # 'reflect' mode needs padding less than the corresponding input dimension.
+        image = Pad((pad_x, pad_y, pad_x, pad_y), fill=0, padding_mode="constant")(image)
+        image = Pad((tile_overlap, tile_overlap, tile_overlap, tile_overlap), fill=0, padding_mode="constant")(image)
 
     _, height, width = image.shape
 
@@ -128,3 +133,4 @@ def get_image_from_tiles(sr_tiles: tensor, tile_size: int, tile_overlap: int, sc
     sr_images = torch.unsqueeze(sr_images, 0)  # Add the batch dimension
 
     return sr_images
+
