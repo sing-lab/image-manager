@@ -351,15 +351,15 @@ class SRResNet(SuperResolutionModelBase):
                     # 2. Loop over all tiles to make predictions
 
                     batches = torch.split(tiles, tile_batch_size, dim=0)  # Create batches of tiles
-                    total_batch = len(batches)
+                    total_batch_tile = len(batches)
 
-                    for i_batch, batch in enumerate(batches):
-                        print(f'{i_batch + 1}/{total_batch} '
-                              f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
-                              f'{"-" * int(40 - 40 * (i_batch + 1) / total_batch)}] '
+                    for i_batch_tile, batch in enumerate(batches):
+                        print(f'{i_batch_tile + 1}/{total_batch_tile} '
+                              f'[{"=" * int(40 * (i_batch_tile + 1) / total_batch_tile)}>'
+                              f'{"-" * int(40 - 40 * (i_batch_tile + 1) / total_batch_tile)}] '
                               f'- Duration {time() - start:.1f} s\r', end="")
-                        index_start = i_batch * tile_batch_size
-                        index_end = min((i_batch + 1) * tile_batch_size, tiles.size()[0])  # Last batch may be smaller.
+                        index_start = i_batch_tile * tile_batch_size
+                        index_end = min((i_batch_tile + 1) * tile_batch_size, tiles.size()[0])  # Last batch may be smaller.
                         batch = test_dataset.normalize(batch)  # Normalize each tile.
                         sr_tiles[index_start: index_end] = self.generator(batch.to(device))
 
@@ -373,7 +373,7 @@ class SRResNet(SuperResolutionModelBase):
                 if images_save_folder:
                     for i in range(sr_images.size(0)):
                         save_image(sr_images[i, :, :, :],
-                                   os.path.join(images_save_folder, f'{i_batch + i}.png'))
+                                   os.path.join(images_save_folder, f'{i_batch + i}.png'))  #TODO change extension with original extension
 
                 print(f'{i_batch + 1}/{total_batch} '
                       f'[{"=" * int(40 * (i_batch + 1) / total_batch)}>'
