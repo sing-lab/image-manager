@@ -43,8 +43,9 @@ def get_model_from_enum(model: ModelEnum, from_pretrained: bool = False) -> Supe
         if from_pretrained:
             for path in ["/", "../../", "../../../"]:  # docker image: '/' - app: '../..' - main: '../../../'
                 try:
-                    base_model.load(generator=os.path.join(path, "models/super_resolution/SRGAN/Article/generator.torch"),
-                                    discriminator=os.path.join(path, "models/super_resolution/SRGAN/Article/discriminator.torch"))
+                    # base_model.load(generator=os.path.join(path, "models/super_resolution/SRGAN/Article/generator.torch"),
+                    base_model.load(generator=os.path.join(path, "models/super_resolution/SRGAN/training_V1/generator_epoch_52.torch"),
+                                    discriminator=os.path.join(path, "models/super_resolution/SRGAN/training_V1/discriminator_epoch_52.torch"))
                 except FileNotFoundError:  # On docker image
                     continue
 
@@ -62,7 +63,7 @@ def get_model_from_enum(model: ModelEnum, from_pretrained: bool = False) -> Supe
         if from_pretrained:
             for path in ["/", "../../", "../../../"]:  # docker image: '/' - app: '../..' - main: '../../../'
                 try:
-                    base_model.load(generator=os.path.join(path, "models/super_resolution/SRGAN/Article/generator.torch"))
+                    base_model.load(generator=os.path.join(path, "models/super_resolution/SRGAN/training_V1/generator_epoch_52.torch"))
                 except FileNotFoundError:  # On docker image
                     continue
 
