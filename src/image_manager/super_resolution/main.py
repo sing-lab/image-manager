@@ -17,7 +17,8 @@ if __name__ == "__main__":
     start = time()
 
     # Loading config.
-    config_path = "../../../configs/SRGAN/srgan_predict_config.yml"  # TODO use arg() or parameter
+    # config_path = "../../../configs/SRGAN/srgan_predict_config.yml"  # TODO use arg() or parameter
+    config_path = "../../../configs/SRResNet/srresnet_train_config.yml"  # TODO use arg() or parameter
     config = load_config(config_path)
 
     # Loading model.

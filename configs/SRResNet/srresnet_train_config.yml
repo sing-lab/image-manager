@@ -1,7 +1,7 @@
 # Configuration file for training a pretrained (generator) SRGAN model.
 
-experiment_name: 'SRESNET/training_V1'
-model_type: 'SRESNET'
+experiment_name: 'SRRESNET/training_V1'
+model_type: 'SRRESNET'
 from_pretrained: False
 task: 'train'  # in ('train', 'test', 'predict')
 
