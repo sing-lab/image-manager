@@ -16,5 +16,5 @@ paths:
 
 hyperparameters:
   batch_size: 32
-  epochs: 104
+  epochs: 52
   learning_rate: 0.0001

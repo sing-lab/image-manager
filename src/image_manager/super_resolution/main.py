@@ -5,6 +5,7 @@ from time import time
 from models.model_enum import ModelEnum, get_model_from_enum
 from super_resolution_data import SuperResolutionData
 from utils import load_config
+import argparse
 
 # TODO seed.
 import torch.backends.cudnn as cudnn
@@ -14,11 +15,25 @@ cudnn.benchmark = True  # Better performances.
 # Split path to let python chose correct separator
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "-c",
+        "--config_path",
+        help="configuration path",
+        type=str,
+        const="SRResNet/srresnet_train_config.yml",  # default value when no arguent provided
+        nargs='?'  # means 0-or-1 arguments
+    )
+
+    args, _ = parser.parse_known_args()
+
+    config_path = os.path.join(*"../../../configs".split('/'), *args.config_path.split('/'))
+    # python main.py -c "SRResNet/srresnet_train_config.yml"
+    # python main.py -c "SRGAN/srgan_predict_config.yml"
     start = time()
 
     # Loading config.
-    # config_path = "../../../configs/SRGAN/srgan_predict_config.yml"  # TODO use arg() or parameter
-    config_path = "../../../configs/SRResNet/srresnet_train_config.yml"  # TODO use arg() or parameter
     config = load_config(config_path)
 
     # Loading model.
