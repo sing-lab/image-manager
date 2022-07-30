@@ -14,3 +14,4 @@ __pycache__/
 /api/app/static/images
 /models/*
 /models
+/logs/

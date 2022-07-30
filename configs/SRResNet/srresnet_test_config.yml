@@ -1,0 +1,11 @@
+# Configuration file for training a pretrained (generator) SRGAN model.
+
+experiment_name: 'SRRESNET/test_V1'
+model_type: 'SRRESNET'
+from_pretrained: True
+task: 'test'  # in ('train', 'test', 'predict')
+reverse_normalize: True
+
+paths:
+  test_set: ['../../../data/raw/test/BSDS100', '../../../data/raw/test/Set5/original', '../../../data/raw/test/Set14/original']
+  test_images_save: ['../../../data/processed/test/BSDS100/', '../../../data/processed/test/Set5/', '../../../data/processed/test/Set14/']

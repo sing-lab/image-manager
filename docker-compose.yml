@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     command: >  # Download models with authentification, and run main script
-        sh -c "dvc pull models/super_resolution/SRGAN/Article/generator.torch &&
+        sh -c "dvc pull models/super_resolution/SRGAN/ssh_V2/generator_epoch_104.torch &&
                cd app &&
                streamlit run main.py"
     ports:

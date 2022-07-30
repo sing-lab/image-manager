@@ -79,7 +79,7 @@ class SRGAN(SuperResolutionModelBase):
             print("Model won't be saved. To save the model, please specify a save folder path.")
 
         # Create log file to monitore training and evaluation.
-        writer = SummaryWriter(os.path.join("samples", "logs", experiment_name))
+        writer = SummaryWriter(os.path.join("..", "..", "..", "logs", experiment_name))
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         self.generator.to(device)

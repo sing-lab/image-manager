@@ -7,8 +7,8 @@ from PIL import Image
 from super_resolution_data import SuperResolutionData
 from models.model_enum import ModelEnum, get_model_from_enum
 
-model_enum = ModelEnum["SRRESNET"]
-model = get_model_from_enum(model_enum, from_pretrained=True)
+model_enum = ModelEnum["SRGAN"]
+model = get_model_from_enum(model_enum, from_pretrained=False)  # Only trained generator not discriminator.
 
 
 def get_prediction(image: Image) -> Image:

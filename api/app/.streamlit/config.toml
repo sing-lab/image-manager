@@ -1,6 +1,7 @@
 [server]
 port = 5000
-maxUploadSize = 500  # Maximum upload size for a file (in mb)
+maxUploadSize = 1028  # Maximum upload size for a file (in mb)
+maxMessageSize = 1028 # Max size, in megabytes, of messages that can be sent via the WebSocket connection.
 enableCORS = false
 enableXsrfProtection=false
 

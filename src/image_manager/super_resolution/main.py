@@ -26,11 +26,13 @@ if __name__ == "__main__":
         nargs='?'  # means 0-or-1 arguments
     )
 
-    args, _ = parser.parse_known_args()
+    # args, _ = parser.parse_known_args()
 
-    config_path = os.path.join(*"../../../configs".split('/'), *args.config_path.split('/'))
+    # config_path = os.path.join(*"../../../configs".split('/'), *args.config_path.split('/'))
     # python main.py -c "SRResNet/srresnet_train_config.yml"
     # python main.py -c "SRGAN/srgan_predict_config.yml"
+
+    config_path = os.path.join(*"../../../configs".split('/'), "SRGAN/srgan_test_config.yml")
     start = time()
 
     # Loading config.
@@ -72,12 +74,16 @@ if __name__ == "__main__":
                                                crop_type='center',
                                                normalize_lr=True)
 
-            psnr, ssim = model.evaluate(val_dataset=test_dataset,
-                                        batch_size=1,
-                                        images_save_folder=os.path.join(*images_save_folder.split('/'),
-                                                                        *config["experiment_name"].split('/')),
-                                        reverse_normalize=config["reverse_normalize"]
-                                        )
+            metrics = model.evaluate(val_dataset=test_dataset,
+                                     batch_size=1,
+                                     images_save_folder=os.path.join(*images_save_folder.split('/'),
+                                                                     *config["experiment_name"].split('/')),
+                                     reverse_normalize=config["reverse_normalize"]
+                                     )
+            try:
+                psnr, ssim = metrics
+            except ValueError:  # SRRESNET also returns loss
+                _, psnr, ssim = metrics
             print(f"{os.path.basename(image_folder)} - PSNR: {psnr}, SSIM: {ssim}")
 
     if config["task"] == 'predict':

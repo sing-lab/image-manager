@@ -82,7 +82,7 @@ class SRResNet(SuperResolutionModelBase):
             print("Model won't be saved. To save the model, please specify a save folder path.")
 
         # Create training process log file.
-        writer = SummaryWriter(os.path.join("samples", "logs", experiment_name))
+        writer = SummaryWriter(os.path.join("..", "..", "..", "logs", experiment_name))
 
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         self.generator.to(device)
@@ -159,6 +159,9 @@ class SRResNet(SuperResolutionModelBase):
                 best_val_loss = val_loss
                 torch.save(self.generator.state_dict(), os.path.join(model_save_folder,
                                                                      f"best_generator_epoch_{epoch + 1}.torch"))
+
+            # Free some memory since their histories may be stored
+            del lr_images, hr_images, sr_images
 
         if model_save_folder:
             torch.save(self.generator.state_dict(),
